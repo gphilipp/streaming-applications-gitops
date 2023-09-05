@@ -10,6 +10,7 @@ spec:
   test:
     enable: false
   values:
+    STREAMS_BOOTSTRAP_SERVERS: pkc-921jm.us-east-2.aws.confluent.cloud:9092
     ingress:
       hosts:
         - host: kafka-music-demo.staging
