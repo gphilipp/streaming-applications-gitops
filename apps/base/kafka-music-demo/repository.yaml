@@ -1,0 +1,11 @@
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: my-helm-repo
+  namespace: kafka-music-demo
+spec:
+  interval: 10m
+  url: oci://ghcr.io/gphilipp/charts
+  type: oci
+  secretRef:
+    name: ghcr-auth
