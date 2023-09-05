@@ -10,8 +10,7 @@ spec:
       chart: kafka-music-demo
       sourceRef:
         kind: HelmRepository
-        name: my-helm-repo
-        namespace: flux-system
+        name: kafka-music-demo
   interval: 10m
   install:
     remediation:
