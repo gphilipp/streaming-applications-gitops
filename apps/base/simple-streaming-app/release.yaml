@@ -4,14 +4,14 @@ metadata:
   name: simple-streaming-app
   namespace: demo-apps
 spec:
-  releaseName: simple-streaming-app-release-name
   chart:
     spec:
       chart: simple-streaming-app
+      reconcileStrategy: ChartVersion
       sourceRef:
-        kind: OCIRepository
+        kind: HelmRepository
         name: simple-streaming-app-helm-repo
-  interval: 1m
   install:
-    remediation:
-      retries: 4
+    createNamespace: true
+  interval: 2m
+  releaseName: simple-streaming-app-release-name

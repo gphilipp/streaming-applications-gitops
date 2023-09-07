@@ -1,12 +1,11 @@
 apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: OCIRepository
+kind: HelmRepository
 metadata:
   name: simple-streaming-app-helm-repo
   namespace: demo-apps
 spec:
   interval: 1m
-  url: oci://ghcr.io/gphilipp/charts/simple-streaming-app
-  ref:
-    tag: 0.4.0
+  type: oci
+  url: oci://ghcr.io/gphilipp/charts
   secretRef:
     name: ghcr-auth
