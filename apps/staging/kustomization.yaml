@@ -6,3 +6,24 @@ patches:
   - path: simple-streaming-app-values.yaml
     target:
       kind: HelmRelease
+  - path: bootstrap-server-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+  - path: cluster-api-key-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+  - path: cluster-api-secret-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+  - path: docker-secret-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+  - path: schema-registry-url-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+  - path: schema-registry-api-key-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+  - path: schema-registry-api-secret-sealed-secret.yaml
+    target:
+      kind: SealedSecret
