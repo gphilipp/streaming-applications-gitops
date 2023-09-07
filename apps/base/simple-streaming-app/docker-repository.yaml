@@ -1,0 +1,9 @@
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageRepository
+metadata:
+  name: simple-streaming-app
+  namespace: simple-streaming-app
+spec:
+  image: ghcr.io/gphilipp/simple-streaming-app
+  interval: 1h
+  provider: generic
