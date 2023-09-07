@@ -6,3 +6,4 @@ resources:
   - repository.yaml
   - release.yaml
   - docker-repository.yaml
+  - docker-secret-sealed-secret.yaml

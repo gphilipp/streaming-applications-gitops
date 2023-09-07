@@ -15,9 +15,6 @@ patches:
   - path: cluster-api-secret-sealed-secret.yaml
     target:
       kind: SealedSecret
-  - path: docker-secret-sealed-secret.yaml
-    target:
-      kind: SealedSecret
   - path: schema-registry-url-sealed-secret.yaml
     target:
       kind: SealedSecret
