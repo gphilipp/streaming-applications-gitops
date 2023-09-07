@@ -10,7 +10,7 @@ spec:
       chart: simple-streaming-app
       sourceRef:
         kind: HelmRepository
-        name: simple-streaming-app
+        name: simple-streaming-app-helm-repo
   interval: 1m
   install:
     remediation:
