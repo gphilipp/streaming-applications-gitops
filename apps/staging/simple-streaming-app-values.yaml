@@ -1,8 +1,8 @@
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
-  name: kafka-music-demo
-  namespace: kafka-music-demo
+  name: simple-streaming-app
+  namespace: simple-streaming-app
 spec:
   chart:
     spec:
@@ -13,7 +13,7 @@ spec:
     STREAMS_BOOTSTRAP_SERVERS: pkc-921jm.us-east-2.aws.confluent.cloud:9092
     ingress:
       hosts:
-        - host: kafka-music-demo.staging
+        - host: simple-streaming-app.staging
           paths:
             - path: /
               pathType: ImplementationSpecific

@@ -3883,8 +3883,8 @@ spec:
                   type: object
                 type: array
               path:
-                description: Path to the directory containing the kafka-music-demo-kustomization.yaml
-                  file, or the set of plain YAMLs a kafka-music-demo-kustomization.yaml should be generated
+                description: Path to the directory containing the simple-streaming-app-kustomization.yaml
+                  file, or the set of plain YAMLs a simple-streaming-app-kustomization.yaml should be generated
                   for. Defaults to 'None', which translates to the root path of the
                   SourceRef.
                 type: string
@@ -3983,7 +3983,7 @@ spec:
                 type: boolean
               targetNamespace:
                 description: TargetNamespace sets or overrides the namespace in the
-                  kafka-music-demo-kustomization.yaml file.
+                  simple-streaming-app-kustomization.yaml file.
                 maxLength: 63
                 minLength: 1
                 type: string
@@ -4427,8 +4427,8 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                 type: array
               path:
-                description: Path to the directory containing the kafka-music-demo-kustomization.yaml
-                  file, or the set of plain YAMLs a kafka-music-demo-kustomization.yaml should be generated
+                description: Path to the directory containing the simple-streaming-app-kustomization.yaml
+                  file, or the set of plain YAMLs a simple-streaming-app-kustomization.yaml should be generated
                   for. Defaults to 'None', which translates to the root path of the
                   SourceRef.
                 type: string
@@ -4517,7 +4517,7 @@ spec:
                 type: boolean
               targetNamespace:
                 description: TargetNamespace sets or overrides the namespace in the
-                  kafka-music-demo-kustomization.yaml file.
+                  simple-streaming-app-kustomization.yaml file.
                 maxLength: 63
                 minLength: 1
                 type: string
@@ -5003,8 +5003,8 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                 type: array
               path:
-                description: Path to the directory containing the kafka-music-demo-kustomization.yaml
-                  file, or the set of plain YAMLs a kafka-music-demo-kustomization.yaml should be generated
+                description: Path to the directory containing the simple-streaming-app-kustomization.yaml
+                  file, or the set of plain YAMLs a simple-streaming-app-kustomization.yaml should be generated
                   for. Defaults to 'None', which translates to the root path of the
                   SourceRef.
                 type: string
@@ -5103,7 +5103,7 @@ spec:
                 type: boolean
               targetNamespace:
                 description: TargetNamespace sets or overrides the namespace in the
-                  kafka-music-demo-kustomization.yaml file.
+                  simple-streaming-app-kustomization.yaml file.
                 maxLength: 63
                 minLength: 1
                 type: string

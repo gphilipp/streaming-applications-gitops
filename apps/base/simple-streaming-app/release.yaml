@@ -1,16 +1,16 @@
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
-  name: kafka-music-demo
-  namespace: kafka-music-demo
+  name: simple-streaming-app
+  namespace: simple-streaming-app
 spec:
-  releaseName: kafka-music-demo
+  releaseName: simple-streaming-app
   chart:
     spec:
-      chart: kafka-music-demo
+      chart: simple-streaming-app
       sourceRef:
         kind: HelmRepository
-        name: kafka-music-demo
+        name: simple-streaming-app
   interval: 10m
   install:
     remediation:
