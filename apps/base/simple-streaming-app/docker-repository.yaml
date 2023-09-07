@@ -7,3 +7,5 @@ spec:
   image: ghcr.io/gphilipp/simple-streaming-app
   interval: 1h
   provider: generic
+  secretRef:
+    name: ghcr-auth
