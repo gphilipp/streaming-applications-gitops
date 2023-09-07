@@ -9,7 +9,7 @@ spec:
     spec:
       chart: simple-streaming-app
       sourceRef:
-        kind: HelmRepository
+        kind: OCIRepository
         name: simple-streaming-app-helm-repo
   interval: 1m
   install:
