@@ -102,6 +102,7 @@ cd streaming-applications-gitops
 ## Install the Weave GitOps Dashboard
 Before we move on to create the files necessary to deploy our apps, we're going to install a nice dashboard to get us a visual interface and  understand what's going on.
 
+
 Install the open source Weave GitOps dashboard with:
 ```shell
 mkdir -p infrastructure/controllers
@@ -115,18 +116,46 @@ gitops create dashboard ww-gitops \
   --export > infrastructure/controllers/weave-gitops-dashboard.yaml
 ```
 
+Commit and push 
 ```shell
 git add infrastructure/
 git commit -m "Deploy Weave GitOps Dashboard"
-git push
+git push origin main
 ```
 
-When the controller is up and running, forward the service port to your host machine:
+Create a file ```clusters/staging/infrastructure.yaml```:
+```yaml
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infra-controllers
+  namespace: flux-system
+spec:
+  interval: 1h
+  retryInterval: 1m
+  timeout: 5m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure/controllers
+  prune: true
+  wait: true
+```
+
+Commit and push
+```shell
+git add clusters/
+git commit -m "Add infrastructure"
+git push origin main
+```
+
+When the controller is up and running, in a separate terminal, forward the service port to your host machine:
 ```shell
 kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
 ```
 
-Point your browser to `https://localhost:9001`. 
+Point your browser to `https://localhost:9001`. The login/password is `admin/admin`.
 This dashboard will give you a clue to visualize what's going on and troubleshoot issues.
 
 TODO add screenshot.
@@ -170,7 +199,7 @@ Deploy the Sealed Secrets controller by pushing the files to GitHub:
 ```shell
 git add infrastructure/
 git commit -m "Deploy Bitnami Sealed Secrets"
-git push
+git push origin main
 ```
 
 The reconciliation process will automatically deploy the controller.
@@ -207,7 +236,7 @@ kubectl create secret generic client-credentials \
     --from-literal=schema-registry-api-key=YOUR_SCHEMA-REGISTRY-API-KEY \
     --from-literal=schema-registry-api-secret=YOUR_SCHEMA-REGISTRY-API-SECRET \
     --dry-run=client \
-    -o yaml > client-credentials.yaml
+    -o yaml > client-credentials-secret.yaml
 ```
 
 In my case, the `client-credentials-secret.yaml` file looks like this:
@@ -237,7 +266,7 @@ kubeseal --format=yaml --cert=pub-sealed-secrets.pem \
 
 Let's have a look at the file:
 ```shell
-cat client-credentials-sealed-secret.yaml
+cat apps/staging/client-credentials-sealed-secret.yaml
 ```
 
 It should look like this, note that it represents a SealedSecret object.
@@ -262,6 +291,13 @@ spec:
       creationTimestamp: null
       name: client-credentials
       namespace: demo-apps
+```
+
+Commit and push
+```shell
+git add apps/staging
+git commit -m "Add confluent cloud client credentials"
+git push origin main
 ```
 
 ## Create a secret for your Helm Chart registry
@@ -299,10 +335,9 @@ kubeseal --format=yaml --cert=pub-sealed-secrets.pem < docker-secret.yaml > apps
 
 Commit and push
 ```shell
-
 git add app/base
 git commit -m "Add Docker Registry secret"
-git push
+git push origin main
 ```
 
 ## Create the files under the ./apps folder
@@ -401,7 +436,7 @@ Commit and push
 ```shell
 git add apps/staging
 git commit -m "Add staging specific files"
-git push
+git push origin main
 ```
 
 ## Build, package and publish the example application
@@ -450,7 +485,7 @@ Move the file under `apps/staging` and commit:
 mv client-credentials-sealed-secret.yaml apps/staging
 git add apps/staging
 git commit -m "Add sealed secret"
-git push
+git push origin main
 ```
 
 ## Additional resources
