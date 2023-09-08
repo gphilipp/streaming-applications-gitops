@@ -1,6 +1,6 @@
 # streaming-applications-gitops
 
-This is loosely inspired from this example from the Flux community ()
+_NOTE: this is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) template by the Flux Community._
 
 In this exercise, we're going to see how to deploy and run Kakfa applications with a GitOps approach.
 
