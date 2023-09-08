@@ -1,5 +1,6 @@
 # streaming-applications-gitops
 
+This is loosely inspired from this example from the Flux community ()
 
 In this exercise, we're going to see how to deploy and run Kakfa applications with a GitOps approach.
 
@@ -445,6 +446,9 @@ Note that in this hands-on exercise, for the sake of brevity, we're going to bui
 
 Fork the https://github.com/gphilipp/simple-streaming-app repository under your own username and clone it on your machine.
 
+```shell
+git clone https://github.com/$GITHUB_USER/simple-streaming-app && cd simple-streaming-app 
+```
 
 In the `deploy/simple-streaming-app/values.yaml` file, replace `YOUR_GITHUB_USERNAME` with your own GitHub username.
 
@@ -468,7 +472,7 @@ echo $GITHUB_TOKEN | helm registry login ghcr.io/$GITHUB_USER --username $GITHUB
 You should now package up the application helm chart.  
 ```shell
  cd deploy 
- helm package simple-streaming-app`
+ helm package simple-streaming-app
 ```
  
 Finally, publish it as a package to GitHub Container Registry:
@@ -482,13 +486,32 @@ Point your browser to your own Helm Chart repository and verify that it's there:
 open https://github.com/users/$GITHUB_USER/packages/container
 ```
 
-Move the file under `apps/staging` and commit:
+## Add the apps to the cluster/staging folder
+
+Create a file `clusters/staging/apps.yaml`:
 ```shell
-mv client-credentials-sealed-secret.yaml apps/staging
-git add apps/staging
-git commit -m "Add sealed secret"
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apps
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./apps/staging
+  prune: true
+  wait: true
+  timeout: 1m0s
+```
+
+```shell
+git add clusters
+git commit -m "Add apps to the cluster"
 git push origin main
 ```
+
 
 ## Additional resources
 https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
