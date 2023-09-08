@@ -38,25 +38,11 @@ export GITHUB_TOKEN=<your github personal access token>
 Next up, create a cluster 
 ```sh
 kind create cluster --name streaming-apps-staging
-Creating cluster "streaming-apps-staging" ...
- ✓ Ensuring node image (kindest/node:v1.27.1) 🖼
- ✓ Preparing nodes 📦
- ✓ Writing configuration 📜
- ✓ Starting control-plane 🕹️
- ✓ Installing CNI 🔌
- ✓ Installing StorageClass 💾
-Set kubectl context to "kind-streaming-apps-staging"
-You can now use your cluster with:
-
-kubectl cluster-info --context kind-streaming-apps-staging
 ```
 
 Activate the cluster with the following command:
 ```sh
 kubectl cluster-info --context kind-streaming-apps-staging
-Kubernetes control plane is running at https://127.0.0.1:52561
-CoreDNS is running at https://127.0.0.1:52561/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
-To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 ```
 
 You will also need `kubetctl` so let's install it too:
@@ -71,7 +57,7 @@ NAME                                   STATUS   ROLES           AGE   VERSION
 streaming-apps-staging-control-plane   Ready    control-plane   16m   v1.27.1
 ```
 
-Let's verify that we have all we need before going further:
+Let's verify that we have all we need before going further with FluxCD:
 ```sh
 flux check --pre
 ► checking prerequisites
@@ -79,7 +65,7 @@ flux check --pre
 ✔ prerequisites checks passed
 ```
 
-Let's bootstrap flux to create a new GitHub repository and link it to your freshly installed Kubernetes cluster. You will have to type or paste your personal access token.
+Let's have flux go through the bootstrap process to create a new GitHub repository and link it to your freshly installed Kubernetes cluster. You will have to type or paste your GitHub personal access token.
 
 ```sh
 flux bootstrap github \
@@ -91,7 +77,7 @@ flux bootstrap github \
   --personal
 ```
 
-Once the bootstrap is done, when you list the namespaces, you should see that the bootstrap command has created a `flux-system` namespace:
+Once the bootstrap is done, when you list the namespaces, you should see that the `flux bootstrap` command has created a `flux-system` namespace:
 ```
 kubectl get ns
 NAME                 STATUS   AGE
@@ -111,7 +97,7 @@ cd streaming-applications-gitops
 ```
 
 ## Install the Weave GitOps Dashboard
-Before we move on to creating the files necessary to deploy our apps, we're going to install a UI dashboard to help us understand what's going on.
+Before we move on to create the files necessary to deploy our apps, we're going to install a nice dashboard to get us a visual interface and  understand what's going on.
 
 Install the open source Weave GitOps dashboard with:
 ```shell
@@ -126,27 +112,33 @@ gitops create dashboard ww-gitops \
   --export > infrastructure/controllers/weave-gitops-dashboard.yaml
 ```
 
-When the controller is up and running, forward the port to your host machine:
+```shell
+git add infrastructure/
+git commit -m "Deploy Weave GitOps Dashboard"
+git push
+```
+
+When the controller is up and running, forward the service port to your host machine:
 ```shell
 kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
 ```
 
-Point your browser to `https://localhost:9001`. This dashboard will give you a clue to visualize what's going on and troubleshoot issues.
+Point your browser to `https://localhost:9001`. 
+This dashboard will give you a clue to visualize what's going on and troubleshoot issues.
 
-```sh
-git add -A && git commit -m "Add Weave Gitops dashboard" && git push
-```
+TODO add screenshot.
 
 ## Install the Sealed Secret controller
-In order to encrypt our secrets (as Kubernetes just computes a hash for classic secrets) and store them safely in the `streaming-applications-gitops` repository, we're going to use Bitnami's Sealed Secrets.
+Kubernetes just computes a hash for classic secrets but what we really want is to store our secrets safely in the repository.
+For this purpose, we will use [Bitnami's Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) to encrypt the classic Kubernetes secrets.
 
-The first step in doing that is to deploy the Sealed Secrets controller, to do that we need the `kubeseal` CLI:
+The first step to do that is to deploy the Sealed Secrets controller and install the `kubeseal` CLI tool:
 
 ```bash
 brew install kubeseal
 ```
 
-Next, create a Flux `Helm repository` resource that points to the sealed-secrets Helm chart:
+Then, create a Flux `Helm repository` resource that points to the sealed-secrets Helm chart:
 ```shell
 flux create source helm sealed-secrets \
     --url https://bitnami-labs.github.io/sealed-secrets \
@@ -172,7 +164,7 @@ flux create helmrelease sealed-secrets \
 
 Deploy the Sealed Secrets controller by pushing the files to GitHub:
 
-```
+```shell
 git add infrastructure/
 git commit -m "Deploy Bitnami Sealed Secrets"
 git push
