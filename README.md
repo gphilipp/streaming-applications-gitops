@@ -37,12 +37,12 @@ export GITHUB_TOKEN=<your github personal access token>
 
 Next up, create a cluster 
 ```sh
-kind create cluster --name streaming-apps-staging
+kind create cluster --name streaming-apps-gitops
 ```
 
 Activate the cluster with the following command:
 ```sh
-kubectl cluster-info --context kind-streaming-apps-staging
+kubectl cluster-info --context kind-streaming-apps-gitops
 ```
 
 You will also need `kubetctl` so let's install it too:
@@ -72,14 +72,17 @@ flux bootstrap github \
   --owner=$GITHUB_USER \
   --repository=streaming-applications-gitops \
   --branch=main \
-  --context=staging \
   --path=./clusters/staging \
   --personal
 ```
 
 Once the bootstrap is done, when you list the namespaces, you should see that the `flux bootstrap` command has created a `flux-system` namespace:
-```
+```shell
 kubectl get ns
+```
+
+This is what I got on my machine:
+```shell 
 NAME                 STATUS   AGE
 default              Active   47m
 flux-system          Active   85s
@@ -107,8 +110,8 @@ brew tap weaveworks/tap
 brew install weaveworks/tap/gitops
 
 PASSWORD="admin"
-gitops create dashboard ww-gitops \  
-  --password=$PASSWORD \  
+gitops create dashboard ww-gitops \
+  --password=$PASSWORD \
   --export > infrastructure/controllers/weave-gitops-dashboard.yaml
 ```
 
