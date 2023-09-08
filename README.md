@@ -444,9 +444,11 @@ git push origin main
 Note that in this hands-on exercise, for the sake of brevity, we're going to build and package the app manually instead of building a CI/CD pipeline.
 
 Fork the https://github.com/gphilipp/simple-streaming-app repository under your own username and clone it on your machine.
+
+
 In the `deploy/simple-streaming-app/values.yaml` file, replace `YOUR_GITHUB_USERNAME` with your own GitHub username.
 
-Log into the Github Container Registry with Docker:
+Next, log into the GitHub Container Registry with Docker:
 
 ```shell
 echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
