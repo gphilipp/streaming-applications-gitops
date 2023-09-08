@@ -8,4 +8,4 @@ spec:
   type: oci
   url: oci://ghcr.io/gphilipp/charts
   secretRef:
-    name: ghcr-auth
+    name: docker-regcred
