@@ -65,6 +65,10 @@ streaming-apps-staging-control-plane   Ready    control-plane   16m   v1.27.1
 Let's verify that we have all we need before going further with FluxCD:
 ```sh
 flux check --pre
+```
+
+If you see the following, all is good!
+```shell
 ► checking prerequisites
 ✔ Kubernetes 1.27.1 >=1.25.0-0
 ✔ prerequisites checks passed
