@@ -220,14 +220,18 @@ Make this namespace the active one:
 ```
 kubens simple-streaming-app
 ```
-## Install the Sealed Secrets controller
 
-Install the `kubeseal` CLI:
+## Create secrets
+
+We're going to create an encrypted secret thanks Bitnami's Sealed Secret tool to store our Confluent Cloud connectivity details.
+
+The first step in doing that is to deploy the Sealed Secrets controller, to do that we need the `kubeseal` CLI:
+
 ```bash
 brew install kubeseal
 ```
 
-Create a Flux `Helm repository` resource that points to the sealed-secrets Helm chart:
+Next, create a Flux `Helm repository` resource that points to the sealed-secrets Helm chart:
 ```shell
 flux create source helm sealed-secrets \
     --url https://bitnami-labs.github.io/sealed-secrets \
@@ -236,7 +240,7 @@ flux create source helm sealed-secrets \
     > infrastructure/controllers/sealed-secrets-source.yaml
 ```
 
-Create a Flux `Helm release` resource:
+Also create a Flux `Helm release` resource:
 
 ```bash
 flux create helmrelease sealed-secrets \
@@ -252,14 +256,16 @@ flux create helmrelease sealed-secrets \
 ```
 
 Deploy the Sealed Secrets controller via GitOps:
+
 ```
 git add infrastructure/
 git commit -m "Deploy Bitnami sealed secrets"
 git push
 ```
+
 The reconciliation process will automatically deploy the controller.
 
-Now, retrieve the public key from the `sealed-secrets` controller with `kubeseal`:
+Now, retrieve the public key from the `sealed-secrets` controller with `kubeseal`:
 ```sh
 kubeseal --fetch-cert \
     --controller-name=sealed-secrets \
@@ -267,64 +273,78 @@ kubeseal --fetch-cert \
     > pub-sealed-secrets.pem
 ```
 
-
-We're going to create a Kubernetes secret locally for each confidential parameter. Let's start with the bootstrap server.
+Create a dry-run normal secret in Kubernetes format into a file: 
 ```shell
-kubectl create secret generic bootstrap-server \  
-    --from-literal=secret=YOUR_BOOTSTRAP_SERVER_HERE \  
-    --dry-run=client \  
-    -o yaml > bootstrap-server-secret.yaml
-    
+kubectl create secret generic client-credentials \
+    --from-literal=bootstrap-server=YOUR_BOOTSTRAP_SERVER \
+    --from-literal=cluster-api-key=YOUR_CLUSTER_API_KEY \
+    --from-literal=cluster-api-secret=YOUR_CLUSTER_API_SECRET \
+    --from-literal=schema-registry-url=YOUR_SCHEMA_REGISTRY_URL \
+    --from-literal=schema-registry-api-key=YOUR_SCHEMA-REGISTRY-API-KEY \
+    --from-literal=schema-registry-api-secret=YOUR_SCHEMA-REGISTRY-API-SECRET \
+    --dry-run=client \
+    -o yaml > client-credentials.yaml
 ```
 
-## Sealing secrets
-Now seal this secret
+In my case, the `client-credentials-secret.yaml` file looks like this:
+```shell
+apiVersion: v1
+data:
+  bootstrap-server: WU9VUl********
+  cluster-api-key: WU9VUl********
+  cluster-api-secret: WU9VUl********
+  schema-registry-api-key: WU9VUl********
+  schema-registry-api-secret: WU9VUl********
+  schema-registry-url: WU9VUl********
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: client-credentials
+```
+
+
 ```bash
-kubeseal --format=yaml --cert=pub-sealed-secrets.pem \  
-    < bootstrap-server-secret.yaml \  
-    > bootstrap-server-sealed-secret.yaml
+kubeseal --format=yaml --cert=pub-sealed-secrets.pem \
+    < client-credentials-secret.yaml \
+    > client-credentials-sealed-secret.yaml
 ```
 
-Now, perform those two steps above for each of the remaining secrets we need: 
-- the Cluster API key and secret. 
-- the Schema Registry URL.
-- the Schema Registry API key and secret.
-
-You will end up with 6 files: 
-- `bootstrap-server-sealed-secret.yaml`
-- `cluster-api-sealed-secret.yaml`
-- `cluster-secret-sealed-secret.yaml`
-- `schema-registry-url-sealed-secret.yaml`
-- `schema-registry-api-key-sealed-secret.yaml`
-- `schema-registry-api-secret-sealed-secret.yaml`
-
-Move those under `apps/staging` and commit:
+Let's have a look at the file:
 ```shell
-mv *sealed-secret.yaml apps/staging
+cat client-credentials-sealed-secret.yaml
+```
+
+It should look like this, note that it represents a SealedSecret object.
+
+```shell
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: client-credentials
+  namespace: demo-apps
+spec:
+  encryptedData:
+    bootstrap-server: ***********************************
+    cluster-api-key: ***********************************==
+    cluster-api-secret: ***********************************==
+    schema-registry-api-key: ***********************************
+    schema-registry-api-secret: ***********************************
+    schema-registry-url: ***********************************=
+  template:
+    metadata:
+      creationTimestamp: null
+      name: client-credentials
+      namespace: demo-apps
+
+```
+
+
+
+Move the file under `apps/staging` and commit:
+```shell
+mv client-credentials-sealed-secret.yaml apps/staging
 git add apps/staging
-git commit -m "Add sealed secrets"
+git commit -m "Add sealed secret"
 git push
-```
-
-
-## Docker secret sealed
-
-Generate the docker registry secret:
-```shell
-kubectl create secret docker-registry docker-regcred \
---dry-run=client \
---docker-server=ghcr.io \
---docker-username=gphilipp \
---docker-password=$GITHUB_PAT \
---namespace=demo-apps \
--o yaml > docker-secret.yaml
-```
-
-Seal the docker registry secret:
-```shell
-kubeseal --format=yaml --cert=pub-sealed-secrets.pem < docker-secret.yaml > docker-secret-sealed-secret.yaml
-```
-
-```shell
-kubectl apply -f docker-secret-sealed-secret.yaml
 ```
