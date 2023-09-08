@@ -344,7 +344,7 @@ kubeseal --format=yaml --cert=pub-sealed-secrets.pem < docker-secret.yaml > apps
 
 Commit and push
 ```shell
-git add app/base
+git add apps/base
 git commit -m "Add Docker Registry secret"
 git push origin main
 ```
