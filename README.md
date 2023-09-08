@@ -54,6 +54,10 @@ brew install kubectl
 Let's check if we can see the Kubernetes node created by Kind:
 ```sh
 kubectl get nodes
+```
+
+Here's what you should see:
+```shell
 NAME                                   STATUS   ROLES           AGE   VERSION
 streaming-apps-staging-control-plane   Ready    control-plane   16m   v1.27.1
 ```
