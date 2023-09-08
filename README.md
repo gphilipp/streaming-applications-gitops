@@ -132,7 +132,7 @@ TODO add screenshot.
 Kubernetes just computes a hash for classic secrets but what we really want is to store our secrets safely in the repository.
 For this purpose, we will use [Bitnami's Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) to encrypt the classic Kubernetes secrets.
 
-The first step to do that is to deploy the Sealed Secrets controller and install the `kubeseal` CLI tool:
+The first step is to deploy the Sealed Secrets controller and install the `kubeseal` CLI tool:
 
 ```bash
 brew install kubeseal
@@ -180,8 +180,89 @@ kubeseal --fetch-cert \
     > pub-sealed-secrets.pem
 ```
 
+
+## Create the demo-apps namespace
+
+Run this command to 
+```shell
+kubectl create namespace demo-apps
+```
+Make this namespace the active one:
+```
+kubectl config set-context --current --namespace=demo-apps 
+```
+
+## Create secrets to connect to Confluent Cloud
+
+Create a dry-run normal secret in Kubernetes format into a file:
+```shell
+kubectl create secret generic client-credentials \
+    --from-literal=bootstrap-server=YOUR_BOOTSTRAP_SERVER \
+    --from-literal=cluster-api-key=YOUR_CLUSTER_API_KEY \
+    --from-literal=cluster-api-secret=YOUR_CLUSTER_API_SECRET \
+    --from-literal=schema-registry-url=YOUR_SCHEMA_REGISTRY_URL \
+    --from-literal=schema-registry-api-key=YOUR_SCHEMA-REGISTRY-API-KEY \
+    --from-literal=schema-registry-api-secret=YOUR_SCHEMA-REGISTRY-API-SECRET \
+    --dry-run=client \
+    -o yaml > client-credentials.yaml
+```
+
+In my case, the `client-credentials-secret.yaml` file looks like this:
+```shell
+apiVersion: v1
+data:
+  bootstrap-server: WU9VUl********
+  cluster-api-key: WU9VUl********
+  cluster-api-secret: WU9VUl********
+  schema-registry-api-key: WU9VUl********
+  schema-registry-api-secret: WU9VUl********
+  schema-registry-url: WU9VUl********
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: client-credentials
+```
+
+Use the `kubeseal` CLI to create a Sealed Secret, it will be attached to the currently active namespace (`demo-apps`): 
+
+```bash
+mkdir -p apps/staging 
+kubeseal --format=yaml --cert=pub-sealed-secrets.pem \
+    < client-credentials-secret.yaml \
+    > apps/staging/client-credentials-sealed-secret.yaml
+```
+
+Let's have a look at the file:
+```shell
+cat client-credentials-sealed-secret.yaml
+```
+
+It should look like this, note that it represents a SealedSecret object.
+
+```shell
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: client-credentials
+  namespace: demo-apps
+spec:
+  encryptedData:
+    bootstrap-server: ***********************************
+    cluster-api-key: ***********************************==
+    cluster-api-secret: ***********************************==
+    schema-registry-api-key: ***********************************
+    schema-registry-api-secret: ***********************************
+    schema-registry-url: ***********************************=
+  template:
+    metadata:
+      creationTimestamp: null
+      name: client-credentials
+      namespace: demo-apps
+```
+
 ## Create a secret for your Helm Chart registry
-Flux will need permission to access your Helm chart registry in order to fetch the helm charts from your own private Github Container Registry. 
+Flux will need permission to access your Helm Charts registry in order to fetch the helm charts from your own private Github Container Registry. 
 
 Create a secret for your token:
 ```shell
@@ -192,7 +273,9 @@ flux create secret oci ghcr-auth \
 ```
 
 ## Create a secret to access your Docker Images registry
-You need to generate a docker registry secret, so that Flux can pull images from your own private Github Container Registry.
+You also need to generate a docker registry secret, so that Flux can pull docker images from your own private Github Container Registry.
+
+This command will just do a dry-run creation of the secret and write it to a file:
 
 ```shell
 kubectl create secret docker-registry docker-regcred \
@@ -204,16 +287,22 @@ kubectl create secret docker-registry docker-regcred \
 -o yaml > docker-secret.yaml
 ```
 
-Just like before, we're going to seal this secret:
+Seal this classic Kubernetes secret with `kubeseal`:
 
+```shell
+mkdir -p apps/base/simple-streaming-app
 kubeseal --format=yaml --cert=pub-sealed-secrets.pem < docker-secret.yaml > apps/base/simple-streaming-app/docker-secret-sealed-secret.yaml
+```
+
+Commit and push
+```shell
+
+git add app/base
+git commit -m "Add Docker Registry secret"
+git push
+```
 
 ## Create the files under the ./apps folder
-
-Let's create a couple of folders to store the Helm charts and Kustomize files for our future streaming application:
-``` sh
-mkdir -p apps/base/simple-streaming-app apps/staging
-```
 
 Create a file `apps/base/simple-streaming-app/namespace.yaml`:
 ```yaml
@@ -246,7 +335,7 @@ spec:
   releaseName: simple-streaming-app-release-name
 ```
 
-Create a file `apps/base/simple-streaming-app/repository.yaml`, dont' forget to replace `YOUR_GIHTUB_USER` in the file with your own GitHub username:
+Create a file `apps/base/simple-streaming-app/repository.yaml`, don't forget to replace `YOUR_GIHTUB_USER` in the file with your own GitHub username:
 ```yaml
 apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: HelmRepository
@@ -261,7 +350,7 @@ spec:
     name: docker-regcred
 ```
 
-Create a file `apps/base/simple-streaming-app/kustomization.yaml`
+Finally, create a Kustomization file `apps/base/simple-streaming-app/kustomization.yaml`:
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -273,13 +362,51 @@ resources:
   - docker-secret-sealed-secret.yaml
 ```
 
-## Build and deploy the example application
+## Create the files under the ./staging folder
+
+Create the file `app/staging/simple-streaming-app-values.yaml`:
+```yaml
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: simple-streaming-app
+  namespace: demo-apps
+spec:
+  chart:
+    spec:
+      version: ">=0.1-alpha"
+  test:
+    enable: false
+```
+
+Finally, create the Kustomization file `app/staging/kustomization.yaml`:
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base/simple-streaming-app/release.yaml
+patches:
+  - path: simple-streaming-app-values.yaml
+    target:
+      kind: HelmRelease
+  - path: client-credentials-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+```
+
+Commit and push
+```shell
+git add apps/staging
+git commit -m "Add staging specific files"
+git push
+```
+
+## Build, package and publish the example application
+
+Note that in this hands-on exercise, for the sake of brevity, we're going to build and package the app manually instead of building a CI/CD pipeline.
 
 Fork the https://github.com/gphilipp/simple-streaming-app repository under your own username.
-
 In the `deploy/simple-streaming-app/values.yaml` file, replace `YOUR_GITHUB_USERNAME` with your own GitHub username.
-
-In this hands-on exercise, for the sake of brevity, we're going to build and package the app manually instead of building a CI/CD pipeline. 
 
 Log into the Github Container Registry with Docker:
 
@@ -290,8 +417,8 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 First, let's build the Docker image:
 
 ```shell
-docker build  -t ghcr.io/$GITHUB_USER/simple-streaming-app:1.0.0 . 
-docker push ghcr.io/$GITHUB_USER/simple-streaming-app:1.0.0
+docker build  -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0 . 
+docker push ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0
 ```
 Next up, log into the Helm Registry.
 ```sh
@@ -314,88 +441,6 @@ Point your browser to your own Helm Chart repository and verify that it's there:
 ```sh
 open https://github.com/users/$GITHUB_USER/packages/container
 ```
-
-
-```sh
-flux get kustomizations --watch
-```
-
-```sh
-kubectl create namespace simple-streaming-app
-```
-Make this namespace the active one:
-```
-kubens simple-streaming-app
-```
-
-## Create secrets to connect to Confluent Cloud
-
-Create a dry-run normal secret in Kubernetes format into a file: 
-```shell
-kubectl create secret generic client-credentials \
-    --from-literal=bootstrap-server=YOUR_BOOTSTRAP_SERVER \
-    --from-literal=cluster-api-key=YOUR_CLUSTER_API_KEY \
-    --from-literal=cluster-api-secret=YOUR_CLUSTER_API_SECRET \
-    --from-literal=schema-registry-url=YOUR_SCHEMA_REGISTRY_URL \
-    --from-literal=schema-registry-api-key=YOUR_SCHEMA-REGISTRY-API-KEY \
-    --from-literal=schema-registry-api-secret=YOUR_SCHEMA-REGISTRY-API-SECRET \
-    --dry-run=client \
-    -o yaml > client-credentials.yaml
-```
-
-In my case, the `client-credentials-secret.yaml` file looks like this:
-```shell
-apiVersion: v1
-data:
-  bootstrap-server: WU9VUl********
-  cluster-api-key: WU9VUl********
-  cluster-api-secret: WU9VUl********
-  schema-registry-api-key: WU9VUl********
-  schema-registry-api-secret: WU9VUl********
-  schema-registry-url: WU9VUl********
-kind: Secret
-metadata:
-  creationTimestamp: null
-  name: client-credentials
-```
-
-
-```bash
-kubeseal --format=yaml --cert=pub-sealed-secrets.pem \
-    < client-credentials-secret.yaml \
-    > client-credentials-sealed-secret.yaml
-```
-
-Let's have a look at the file:
-```shell
-cat client-credentials-sealed-secret.yaml
-```
-
-It should look like this, note that it represents a SealedSecret object.
-
-```shell
-apiVersion: bitnami.com/v1alpha1
-kind: SealedSecret
-metadata:
-  creationTimestamp: null
-  name: client-credentials
-  namespace: demo-apps
-spec:
-  encryptedData:
-    bootstrap-server: ***********************************
-    cluster-api-key: ***********************************==
-    cluster-api-secret: ***********************************==
-    schema-registry-api-key: ***********************************
-    schema-registry-api-secret: ***********************************
-    schema-registry-url: ***********************************=
-  template:
-    metadata:
-      creationTimestamp: null
-      name: client-credentials
-      namespace: demo-apps
-
-```
-
 
 Move the file under `apps/staging` and commit:
 ```shell
