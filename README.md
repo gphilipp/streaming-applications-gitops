@@ -110,120 +110,35 @@ git clone https://github.com/$GITHUB_USER/streaming-applications-gitops
 cd streaming-applications-gitops
 ```
 
-Let's create a couple folders to store the Helm charts and Kustomize files:
-``` sh
-mkdir -p apps/base/simple-streaming-app apps/staging
-```
+## Install the Weave GitOps Dashboard
+Before we move on to creating the files necessary to deploy our apps, we're going to install a UI dashboard to help us understand what's going on.
 
-```sh
-git add -A && git commit -m "add dev cluster" && git push
-```
-
-## Creating the Helm Chart
+Install the open source Weave GitOps dashboard with:
 ```shell
-mkdir deploy && cd deploy
-helm create simple-streaming-app
-```
-TODO: make adjustments
+mkdir -p infrastructure/controllers
 
-## Install the WeaveOps UI
-
-```shell
-brew tap weaveworks/tap  
+brew tap weaveworks/tap
 brew install weaveworks/tap/gitops
-```
 
-Install the OSS Weave GitOps dashboard with:
-```shell
-PASSWORD="admin"  
+PASSWORD="admin"
 gitops create dashboard ww-gitops \  
   --password=$PASSWORD \  
-  --export > ./clusters/staging/weave-gitops-dashboard.yaml
+  --export > infrastructure/controllers/weave-gitops-dashboard.yaml
 ```
 
-
-Log into the Github Container Registry with Docker:
+When the controller is up and running, forward the port to your host machine:
 ```shell
-echo $CR_PAT | docker login ghcr.io -u $GITHUB_USER --password-stdin
+kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
 ```
 
-## Build and publish the Docker image
-
-```shell
-docker build  -t ghcr.io/gphilipp/simple-streaming-app:0.1.0 .
-```
-
-```shell
-docker push ghcr.io/gphilipp/simple-streaming-app:0.1.0
-```
-
-## Create and publish the Helm Chart
-
-TODO
-```shell
-helm create 
-```
-
-Log into the Helm Registry
-```sh
-echo $GITHUB_TOKEN | helm registry login ghcr.io/$GITHUB_USER --username $GITHUB_USER --password-stdin
-```
-
-```shell
- cd deploy 
- helm package simple-streaming-app`
-```
- 
-Next,  push it to GitHub Container Registry
-```sh
- export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
-helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
-```
-
-Browse your Helm Chart repository and verify that it's there:
-```sh
-open https://github.com/users/$GITHUB_USER/packages/container
-```
-
-Create a secret for your token:
-```shell
-flux create secret oci ghcr-auth \
-  --url=ghcr.io \
-  --username=flux \
-  --password=${GITHUB_TOKEN}
-# oci secret 'ghcr-auth' created in 'flux-system' namespace
-```
-
-Save this file under `apps/base/my-helm-repository.yaml` 
-```yaml
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmRepository
-metadata:
-  name: my-helm-repository
-  namespace: flux-system
-spec:
-  interval: 10m
-  url: oci://ghcr.io/gphilipp/charts
-  type: oci
-  secretRef:  
-    name: ghcr-auth
-```
+Point your browser to `https://localhost:9001`. This dashboard will give you a clue to visualize what's going on and troubleshoot issues.
 
 ```sh
-flux get kustomizations --watch
+git add -A && git commit -m "Add Weave Gitops dashboard" && git push
 ```
 
-```sh
-kubectl create namespace simple-streaming-app
-```
-Make this namespace the active one:
-```
-kubens simple-streaming-app
-```
-
-## Create secrets
-
-We're going to create an encrypted secret thanks Bitnami's Sealed Secret tool to store our Confluent Cloud connectivity details.
+## Install the Sealed Secret controller
+In order to encrypt our secrets (as Kubernetes just computes a hash for classic secrets) and store them safely in the `streaming-applications-gitops` repository, we're going to use Bitnami's Sealed Secrets.
 
 The first step in doing that is to deploy the Sealed Secrets controller, to do that we need the `kubeseal` CLI:
 
@@ -255,23 +170,173 @@ flux create helmrelease sealed-secrets \
     > infrastructure/controllers/sealed-secrets-release.yaml
 ```
 
-Deploy the Sealed Secrets controller via GitOps:
+Deploy the Sealed Secrets controller by pushing the files to GitHub:
 
 ```
 git add infrastructure/
-git commit -m "Deploy Bitnami sealed secrets"
+git commit -m "Deploy Bitnami Sealed Secrets"
 git push
 ```
 
 The reconciliation process will automatically deploy the controller.
 
-Now, retrieve the public key from the `sealed-secrets` controller with `kubeseal`:
+You can now retrieve and store on your disk the public key from the `sealed-secrets` controller with `kubeseal`:
 ```sh
 kubeseal --fetch-cert \
     --controller-name=sealed-secrets \
     --controller-namespace=flux-system \
     > pub-sealed-secrets.pem
 ```
+
+## Create a secret for your Helm Chart registry
+Flux will need permission to access your Helm chart registry in order to fetch the helm charts from your own private Github Container Registry. 
+
+Create a secret for your token:
+```shell
+flux create secret oci ghcr-auth \
+  --url=ghcr.io \
+  --username=flux \
+  --password=${GITHUB_TOKEN}
+```
+
+## Create a secret to access your Docker Images registry
+You need to generate a docker registry secret, so that Flux can pull images from your own private Github Container Registry.
+
+```shell
+kubectl create secret docker-registry docker-regcred \
+--dry-run=client \
+--docker-server=ghcr.io \
+--docker-username=$GITHUB_USER \
+--docker-password=$GITHUB_TOKEN \
+--namespace=demo-apps \
+-o yaml > docker-secret.yaml
+```
+
+Just like before, we're going to seal this secret:
+
+kubeseal --format=yaml --cert=pub-sealed-secrets.pem < docker-secret.yaml > apps/base/simple-streaming-app/docker-secret-sealed-secret.yaml
+
+## Create the files under the ./apps folder
+
+Let's create a couple of folders to store the Helm charts and Kustomize files for our future streaming application:
+``` sh
+mkdir -p apps/base/simple-streaming-app apps/staging
+```
+
+Create a file `apps/base/simple-streaming-app/namespace.yaml`:
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-apps
+  labels:
+    toolkit.fluxcd.io/tenant: demo-dev-team
+```
+
+Create a file `apps/base/simple-streaming-app/release.yaml`:
+```yaml
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: simple-streaming-app
+  namespace: demo-apps
+spec:
+  chart:
+    spec:
+      chart: simple-streaming-app
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: simple-streaming-app-helm-repo
+  install:
+    createNamespace: true
+  interval: 2m
+  releaseName: simple-streaming-app-release-name
+```
+
+Create a file `apps/base/simple-streaming-app/repository.yaml`, dont' forget to replace `YOUR_GIHTUB_USER` in the file with your own GitHub username:
+```yaml
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: simple-streaming-app-helm-repo
+  namespace: demo-apps
+spec:
+  interval: 1m
+  type: oci
+  url: oci://ghcr.io/YOUR_GIHTUB_USER/charts
+  secretRef:
+    name: docker-regcred
+```
+
+Create a file `apps/base/simple-streaming-app/kustomization.yaml`
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: demo-apps
+resources:
+  - namespace.yaml
+  - repository.yaml
+  - release.yaml
+  - docker-secret-sealed-secret.yaml
+```
+
+## Build and deploy the example application
+
+Fork the https://github.com/gphilipp/simple-streaming-app repository under your own username.
+
+In the `deploy/simple-streaming-app/values.yaml` file, replace `YOUR_GITHUB_USERNAME` with your own GitHub username.
+
+In this hands-on exercise, for the sake of brevity, we're going to build and package the app manually instead of building a CI/CD pipeline. 
+
+Log into the Github Container Registry with Docker:
+
+```shell
+echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
+```
+
+First, let's build the Docker image:
+
+```shell
+docker build  -t ghcr.io/$GITHUB_USER/simple-streaming-app:1.0.0 . 
+docker push ghcr.io/$GITHUB_USER/simple-streaming-app:1.0.0
+```
+Next up, log into the Helm Registry.
+```sh
+echo $GITHUB_TOKEN | helm registry login ghcr.io/$GITHUB_USER --username $GITHUB_USER --password-stdin
+```
+
+You should now package up the application helm chart.  
+```shell
+ cd deploy 
+ helm package simple-streaming-app`
+```
+ 
+Finally, publish it as a package to GitHub Container Registry:
+```sh
+ export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
+helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
+```
+
+Point your browser to your own Helm Chart repository and verify that it's there:
+```sh
+open https://github.com/users/$GITHUB_USER/packages/container
+```
+
+
+```sh
+flux get kustomizations --watch
+```
+
+```sh
+kubectl create namespace simple-streaming-app
+```
+Make this namespace the active one:
+```
+kubens simple-streaming-app
+```
+
+## Create secrets to connect to Confluent Cloud
 
 Create a dry-run normal secret in Kubernetes format into a file: 
 ```shell
@@ -340,7 +405,6 @@ spec:
 ```
 
 
-
 Move the file under `apps/staging` and commit:
 ```shell
 mv client-credentials-sealed-secret.yaml apps/staging
@@ -348,3 +412,6 @@ git add apps/staging
 git commit -m "Add sealed secret"
 git push
 ```
+
+## Additional resources
+https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
