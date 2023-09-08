@@ -340,7 +340,7 @@ git commit -m "Add Docker Registry secret"
 git push origin main
 ```
 
-## Create the files under the ./apps folder
+## Create the files under the ./apps/base folder
 
 Create a file `apps/base/simple-streaming-app/namespace.yaml`:
 ```yaml
@@ -400,9 +400,9 @@ resources:
   - docker-secret-sealed-secret.yaml
 ```
 
-## Create the files under the ./staging folder
+## Create the files under the ./apps/staging folder
 
-Create the file `app/staging/simple-streaming-app-values.yaml`:
+Create the file `apps/staging/simple-streaming-app-values.yaml`:
 ```yaml
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
@@ -417,7 +417,7 @@ spec:
     enable: false
 ```
 
-Finally, create the Kustomization file `app/staging/kustomization.yaml`:
+Finally, create the Kustomization file `apps/staging/kustomization.yaml`:
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -434,8 +434,8 @@ patches:
 
 Commit and push
 ```shell
-git add apps/staging
-git commit -m "Add staging specific files"
+git add apps
+git commit -m "Add apps files"
 git push origin main
 ```
 
@@ -443,7 +443,7 @@ git push origin main
 
 Note that in this hands-on exercise, for the sake of brevity, we're going to build and package the app manually instead of building a CI/CD pipeline.
 
-Fork the https://github.com/gphilipp/simple-streaming-app repository under your own username.
+Fork the https://github.com/gphilipp/simple-streaming-app repository under your own username and clone it on your machine.
 In the `deploy/simple-streaming-app/values.yaml` file, replace `YOUR_GITHUB_USERNAME` with your own GitHub username.
 
 Log into the Github Container Registry with Docker:
