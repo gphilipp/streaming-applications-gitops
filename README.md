@@ -10,8 +10,11 @@ You will:
 4. Deploy this application by just committing code to GitHub, you will not interact with the Kubernetes Cluster directly
 
 
+### Install Kind
 
-First, [install kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). If you are on a Mac with Homebrew installed, you can just run:
+First, [install kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). 
+If you are on a Mac with Homebrew installed, you can just run:
+
 ```shell
 brew install kind
 ```
@@ -23,14 +26,15 @@ In order to install the FluxCD agent into your Kubernetes cluster,  you will nee
 brew install fluxcd/tap/flux
 ```
 
-You will need to export your GitHub credentials:
+You will need to export your GitHub username and a classic GitHub Personal Access Token, just make sure that this token has the permissions to read/write repositories AND packages too.
 
 ```sh
 export GITHUB_USER=<your github username>
-export GITHUB_TOKEN=<a github personal access token which can read/write repos AND packages>
+export GITHUB_TOKEN=<your github personal access token>
 ```
 
 ## Create a local Kubernetes cluster
+
 Next up, create a cluster 
 ```sh
 kind create cluster --name streaming-apps-staging
@@ -75,7 +79,7 @@ flux check --pre
 ✔ prerequisites checks passed
 ```
 
-Let's bootstrap flux to "connect" a new dedicated GitHub repo to your freshly installed Kubernetes cluster. You will have to type or paste your personal access token.
+Let's bootstrap flux to create a new GitHub repository and link it to your freshly installed Kubernetes cluster. You will have to type or paste your personal access token.
 
 ```sh
 flux bootstrap github \
@@ -87,7 +91,7 @@ flux bootstrap github \
   --personal
 ```
 
-If you list the namespaces, you should see that the bootstrap command has created a `flux-system` namespace:
+Once the bootstrap is done, when you list the namespaces, you should see that the bootstrap command has created a `flux-system` namespace:
 ```
 kubectl get ns
 NAME                 STATUS   AGE
@@ -99,20 +103,16 @@ kube-system          Active   47m
 local-path-storage   Active   47m
 ```
 
-FluxCD Clone the GitHub repository on your machine:
+In order to make changes, you must clone the `streaming-applications-gitops` GitHub repository on your machine:
 
 ```sh
 git clone https://github.com/$GITHUB_USER/streaming-applications-gitops
 cd streaming-applications-gitops
 ```
 
-Let's create two folders to store the Helm charts and Kustomize files:
+Let's create a couple folders to store the Helm charts and Kustomize files:
 ``` sh
 mkdir -p apps/base/simple-streaming-app apps/staging
-```
-
-```sh
-docker pull confluentinc/kafka-streams-examples
 ```
 
 ```sh
