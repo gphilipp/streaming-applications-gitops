@@ -309,6 +309,11 @@ git commit -m "Add confluent cloud client credentials"
 git push origin main
 ```
 
+You have to apply the manifest manually (for some reason Flux doesn't register it automatically):
+```shell
+kubectl apply -f apps/staging/client-credentials-sealed-secret.yaml
+```
+
 ## Create a secret for your Helm Chart registry
 Flux will need permission to access your Helm Charts registry in order to fetch the helm charts from your own private Github Container Registry. 
 
@@ -347,6 +352,11 @@ Commit and push
 git add apps/base
 git commit -m "Add Docker Registry secret"
 git push origin main
+```
+
+You have to apply the manifest manually (for some reason Flux doesn't register it automatically):
+```shell
+kubectl apply -f apps/base/simple-streaming-app/docker-secret-sealed-secret.yaml
 ```
 
 ## Create the files under the ./apps/base folder
@@ -395,6 +405,11 @@ spec:
   url: oci://ghcr.io/YOUR_GIHTUB_USER/charts
   secretRef:
     name: docker-regcred
+```
+
+You have to apply the manifest manually (for some reason Flux doesn't register it automatically):
+```shell
+kubectl apply -f apps/base/simple-streaming-app/repository.yaml
 ```
 
 Finally, create a Kustomization file `apps/base/simple-streaming-app/kustomization.yaml`:
