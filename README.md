@@ -13,8 +13,6 @@ You need:
 - A GitHub account
 - [Homebrew](https://brew.sh)
 
-NOTE: this exercise is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) example by the Flux team._
-
 ### Install Kind
 
 We're going to need a Kubernetes cluster to deploy FluxCD and run our application.
@@ -558,8 +556,10 @@ Once the application deployment is reconciled, you will see that messages will b
 
 ![messages](images/messages.png)
 
+This exercise is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) example by the Flux team.
 If you want to go further, you can :
-- implement a production promotion workflow similar to what we've done in the previous exercise using GitHub Actions and Pull Requests. 
+- implement a production promotion workflow similar to what we've done in the previous hands-on exercise using GitHub Actions and Pull Requests. 
 You can find instructions on how to do so on [Promote Flux Helm Releases with GitHub Actions](https://fluxcd.io/flux/use-cases/gh-actions-helm-promotion/).
 - investigate multi-tenancy with https://github.com/fluxcd/flux2-multi-tenancy
+
 
