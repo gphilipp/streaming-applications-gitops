@@ -2,36 +2,29 @@
 
 _NOTE: this is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) template by the Flux Community._
 
-In this exercise, we're going to see how to deploy and run Kakfa applications with a GitOps approach.
+In this exercise, we're going to see how to deploy and run a Kafka streaming application on Kubernetes using the GitOps approach.
 
 You will:
 1. Create a local Kubernetes cluster
 2. Install the FluxCD GitOps tool
 3. Write and package a simple kafka producing application
-4. Deploy this application by just committing code to GitHub, you will not interact with the Kubernetes Cluster directly
+4. Deploy this application by just committing code to GitHub
+
+You need:
+- A Confluent Cloud cluster (the Staging cluster you provisioned in the previous hands on exercise will do)
+- A GitHub account
+- [Homebrew](https://brew.sh)
 
 
 ### Install Kind
 
-First, [install kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). 
-If you are on a Mac with Homebrew installed, you can just run:
+We're going to need a Kubernetes cluster to deploy FluxCD to and to run our application.
+If you don't already have a Kubernetes cluster to play with, you can create one with [Kind](https://kind.sigs.k8s.io).  
+
+Once you have Homebrew installed, just run:
 
 ```shell
 brew install kind
-```
-
-### Install FluxCD
-
-In order to install the FluxCD agent into your Kubernetes cluster,  you will need [install the Flux CI](https://fluxcd.io/flux/installation/#install-the-flux-cli):
-```
-brew install fluxcd/tap/flux
-```
-
-You will need to export your GitHub username and a classic GitHub Personal Access Token, just make sure that this token has the permissions to read/write repositories AND packages too.
-
-```sh
-export GITHUB_USER=<your github username>
-export GITHUB_TOKEN=<your github personal access token>
 ```
 
 ## Create a local Kubernetes cluster
@@ -59,15 +52,30 @@ kubectl get nodes
 Here's what you should see:
 ```shell
 NAME                                   STATUS   ROLES           AGE   VERSION
-streaming-apps-staging-control-plane   Ready    control-plane   16m   v1.27.1
+streaming-apps-gitops-control-plane   Ready    control-plane   16m   v1.27.1
+```
+
+### Install FluxCD
+Next up, let's install the [FluxCD GitOps tool](https://fluxcd.io).
+```
+brew install fluxcd/tap/flux
+```
+
+You will need to export your GitHub username and a classic GitHub Personal Access Token, just make sure that this token has the permissions to read/write repositories AND packages too.
+
+```sh
+export GITHUB_USER=<your github username>
+export GITHUB_TOKEN=<your github personal access token>
 ```
 
 Let's verify that we have all we need before going further with FluxCD:
+
 ```sh
 flux check --pre
 ```
 
 If you see the following, all is good!
+
 ```shell
 ► checking prerequisites
 ✔ Kubernetes 1.27.1 >=1.25.0-0
@@ -93,15 +101,15 @@ kubectl get ns
 This is what I got on my machine:
 ```shell 
 NAME                 STATUS   AGE
-default              Active   47m
-flux-system          Active   85s
-kube-node-lease      Active   47m
-kube-public          Active   47m
-kube-system          Active   47m
-local-path-storage   Active   47m
+default              Active   106s
+flux-system          Active   24s
+kube-node-lease      Active   106s
+kube-public          Active   106s
+kube-system          Active   106s
+local-path-storage   Active   102s
 ```
 
-In order to make changes, you must clone the `streaming-applications-gitops` GitHub repository on your machine:
+In order to make changes to your cluster, you must first clone the `streaming-applications-gitops` GitHub repository on your machine:
 
 ```sh
 git clone https://github.com/$GITHUB_USER/streaming-applications-gitops
@@ -109,30 +117,25 @@ cd streaming-applications-gitops
 ```
 
 ## Install the Weave GitOps Dashboard
-Before we move on to create the files necessary to deploy our apps, we're going to install a nice dashboard to get us a visual interface and  understand what's going on.
+Before we move on and create the files necessary to deploy our apps, we're going to install a nice dashboard to get us a visual interface and understand what's going on.
 
-
-Install the open source Weave GitOps dashboard with:
+Install the open source Weave GitOps CLI with:
 ```shell
-mkdir -p infrastructure/controllers
-
 brew tap weaveworks/tap
 brew install weaveworks/tap/gitops
+```
+
+Deploy the dashboard with:
+```shell
+mkdir -p infrastructure/controllers
 
 PASSWORD="admin"
 gitops create dashboard ww-gitops \
   --password=$PASSWORD \
   --export > infrastructure/controllers/weave-gitops-dashboard.yaml
-```
 
-Commit and push 
-```shell
-git add infrastructure/
-git commit -m "Deploy Weave GitOps Dashboard"
-git push origin main
 ```
-
-Create a file ```clusters/staging/infrastructure.yaml```:
+Create a file `clusters/staging/infrastructure.yaml`:
 ```yaml
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -154,14 +157,14 @@ spec:
 
 Commit and push
 ```shell
-git add clusters/
-git commit -m "Add infrastructure"
+git add clusters infrastructure
+git commit -m "Deploy Weave GitOps Dashboard"
 git push origin main
 ```
 
-Wait for the Weave GitOps controller service to be up and running (it's called `ww-gitops-weave-gitops`):
+Wait a few seconds for the Weave GitOps controller service to appear under the name `ww-gitops-weave-gitops`:
 ```shell
-kubectl get services --namespace flux-system 
+kubectl get services --namespace flux-system -w 
 ```
 
 When the controller is up and running, in a separate terminal, forward the service port to your host machine:
@@ -169,10 +172,10 @@ When the controller is up and running, in a separate terminal, forward the servi
 kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
 ```
 
-Point your browser to `https://localhost:9001`. The login/password is `admin/admin`.
+Point your browser to `https://localhost:9001`, the login is `admin` and the `password` is `admin` too.
 This dashboard will give you a clue to visualize what's going on and troubleshoot issues.
 
-TODO add screenshot.
+![Weave GitOps dashboard](images/weave-gitops-dashboard.png)
 
 ## Install the Sealed Secret controller
 Kubernetes just computes a hash for classic secrets but what we really want is to store our secrets safely in the repository.
@@ -513,6 +516,18 @@ Point your browser to your own Helm Chart repository and verify that it's there:
 ```sh
 open https://github.com/users/$GITHUB_USER/packages/container
 ```
+
+
+## Create the users topic
+
+Before we deploy the application, we need the topic in Confluent Cloud. 
+You can either: 
+  1. Create a pre-task that runs a `curl` command and use the [Confluent Cloud Topic Creation API](https://docs.confluent.io/cloud/current/api.html#tag/Topic-(v3)/operation/createKafkaTopic).
+  2. Create a pre-task with the [Weave GitOps Terraform Controller](https://github.com/weaveworks/tf-controller) to reconcile a Terraform Topic resource the GitOps way
+
+For the sake of brevity, just create the `users` topic manually in the Confluent Cloud UI console.
+
+![Create users topics](images/create-topic.png)
 
 ## Add the apps to the cluster/staging folder
 
