@@ -6478,7 +6478,7 @@ spec:
                 type: array
               exclusionList:
                 description: A list of Golang regular expressions to be used for excluding
-                  messages.
+                  messages.png.
                 items:
                   type: string
                 type: array
@@ -6685,13 +6685,13 @@ spec:
                 type: array
               exclusionList:
                 description: ExclusionList specifies a list of Golang regular expressions
-                  to be used for excluding messages.
+                  to be used for excluding messages.png.
                 items:
                   type: string
                 type: array
               inclusionList:
                 description: InclusionList specifies a list of Golang regular expressions
-                  to be used for including messages.
+                  to be used for including messages.png.
                 items:
                   type: string
                 type: array

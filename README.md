@@ -1,24 +1,21 @@
 # streaming-applications-gitops
 
-_NOTE: this is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) template by the Flux Community._
-
 In this exercise, we're going to see how to deploy and run a Kafka streaming application on Kubernetes using the GitOps approach.
 
 You will:
-1. Create a local Kubernetes cluster
-2. Install the FluxCD GitOps tool
-3. Write and package a simple kafka producing application
-4. Deploy this application by just committing code to GitHub
+1. Create a local Kubernetes cluster.
+2. Install the FluxCD GitOps tool.
+3. Build and package a simple kafka producing application.
+4. Deploy this application by just committing code to GitHub.
 
 You need:
-- A Confluent Cloud cluster (the Staging cluster you provisioned in the previous hands on exercise will do)
+- A Confluent Cloud cluster (the Staging cluster you provisioned in the previous hands-on exercise will do)
 - A GitHub account
 - [Homebrew](https://brew.sh)
 
-
 ### Install Kind
 
-We're going to need a Kubernetes cluster to deploy FluxCD to and to run our application.
+We're going to need a Kubernetes cluster to deploy FluxCD and run our application.
 If you don't already have a Kubernetes cluster to play with, you can create one with [Kind](https://kind.sigs.k8s.io).  
 
 Once you have Homebrew installed, just run:
@@ -529,7 +526,7 @@ For the sake of brevity, just create the `users` topic manually in the Confluent
 
 ![Create users topics](images/create-topic.png)
 
-## Add the apps to the cluster/staging folder
+## Deploy the application in the Staging cluster
 
 Create a file `clusters/staging/apps.yaml`:
 ```shell
@@ -555,6 +552,8 @@ git commit -m "Add apps to the cluster"
 git push origin main
 ```
 
+Once the application deployment is reconciled, you will see that messages will be published in the `users` topic in your Confluent Cloud Cluster.
 
-## Additional resources
-https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
+![messages](images/messages.png)
+
+_NOTE: this exercice is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) template by the Flux Community._
