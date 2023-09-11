@@ -41,14 +41,14 @@ Next up, create a cluster
 kind create cluster --name streaming-apps-gitops
 ```
 
+You will also need `kubectl` so let's install it now:
+```sh
+brew install kubectl
+```
+
 Activate the cluster with the following command:
 ```sh
 kubectl cluster-info --context kind-streaming-apps-gitops
-```
-
-You will also need `kubetctl` so let's install it too:
-```sh
-brew install kubectl
 ```
 
 Let's check if we can see the Kubernetes node created by Kind:
@@ -159,6 +159,11 @@ git commit -m "Add infrastructure"
 git push origin main
 ```
 
+Wait for the Weave GitOps controller service to be up and running (it's called `ww-gitops-weave-gitops`):
+```shell
+kubectl get services --namespace flux-system 
+```
+
 When the controller is up and running, in a separate terminal, forward the service port to your host machine:
 ```shell
 kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
@@ -229,7 +234,7 @@ Run this command to
 kubectl create namespace demo-apps
 ```
 Make this namespace the active one:
-```
+```shell
 kubectl config set-context --current --namespace=demo-apps 
 ```
 
