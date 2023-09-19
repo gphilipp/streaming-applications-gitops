@@ -351,7 +351,7 @@ spec:
     remediation:
       retries: -1
   interval: 2m
-  releaseName: simple-streaming-app-release-name
+  releaseName: simple-streaming-app
 ```
 
 Create a flux source for the application Helm Repository
