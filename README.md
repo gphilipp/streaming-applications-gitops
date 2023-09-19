@@ -227,18 +227,6 @@ kubeseal --fetch-cert \
     > pub-sealed-secrets.pem
 ```
 
-
-## Create the demo-apps namespace
-
-Run this command to 
-```shell
-kubectl create namespace demo-apps
-```
-Make this namespace the active one:
-```shell
-kubectl config set-context --current --namespace=demo-apps 
-```
-
 ## Create secrets to connect to Confluent Cloud
 
 Create a dry-run normal secret in Kubernetes format into a file:
