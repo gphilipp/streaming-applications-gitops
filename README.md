@@ -208,12 +208,12 @@ git commit -m "Deploy infrastructure"
 git push origin main
 ```
 
-Wait a few seconds for the Weave GitOps controller service to appear under the name `ww-gitops-weave-gitops`:
+Wait a few seconds for the Weave GitOps controller pod to appear under the name `ww-gitops-weave-gitops-XXXX`:
 ```shell
-kubectl get services --namespace flux-system -w 
+kubectl get pods --namespace flux-system -w 
 ```
 
-When the controller is up and running, in a separate terminal, forward the service port to your host machine:
+When the pod is up and running, in a separate terminal, forward the service port to your host machine:
 ```shell
 kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
 ```
