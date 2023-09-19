@@ -6,6 +6,3 @@ patches:
   - path: simple-streaming-app-values.yaml
     target:
       kind: HelmRelease
-  - path: client-credentials-sealed-secret.yaml
-    target:
-      kind: SealedSecret
