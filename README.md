@@ -28,7 +28,7 @@ brew install kind
 
 Next up, create a cluster 
 ```sh
-kind create cluster --name streaming-apps-gitops
+kind create cluster --name staging
 ```
 
 You will also need `kubectl` so let's install it now:
@@ -38,7 +38,7 @@ brew install kubectl
 
 Activate the cluster with the following command:
 ```sh
-kubectl cluster-info --context kind-streaming-apps-gitops
+kubectl cluster-info --context kind-staging
 ```
 
 Let's check if we can see the Kubernetes node created by Kind:
@@ -85,6 +85,7 @@ Let's have flux go through the bootstrap process to create a new GitHub reposito
 flux bootstrap github \
   --owner=$GITHUB_USER \
   --repository=streaming-applications-gitops \
+  --context=kind-staging \
   --branch=main \
   --path=./clusters/staging \
   --personal
