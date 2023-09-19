@@ -310,7 +310,7 @@ kubectl create secret docker-registry docker-regcred \
 --docker-username=$GITHUB_USER \
 --docker-password=$GITHUB_TOKEN \
 --namespace=demo-apps \
--o yaml > apps/base/simple-streaming-app/docker-secret.yaml
+-o yaml > apps/staging/docker-secret.yaml
 ```
 
 Once again, encrypt the sensitive data in-place:
@@ -318,7 +318,7 @@ Once again, encrypt the sensitive data in-place:
 ```shell
 sops --age=$(cat clusters/staging/public.agekey) \
 --encrypt --encrypted-regex '^(data|stringData)$' \
---in-place apps/base/simple-streaming-app/docker-secret.yaml
+--in-place apps/staging/docker-secret.yaml
 ```
 
 Create a file `apps/base/simple-streaming-app/namespace.yaml` to have the namespace automatically created too:
@@ -402,6 +402,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../base/simple-streaming-app
+  - docker-secret.yaml
   - client-credentials-secret.yaml
 patches:
   - path: simple-streaming-app-values.yaml
