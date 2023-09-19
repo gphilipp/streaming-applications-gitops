@@ -345,7 +345,6 @@ spec:
         kind: HelmRepository
         name: simple-streaming-app-helm-repo
   install:
-    createNamespace: true
     remediation:
       retries: -1
   upgrade:
