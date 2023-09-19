@@ -31,7 +31,7 @@ Next up, create a cluster
 kind create cluster --name staging
 ```
 
-You will also need `kubectl` so let's install it now:
+We're also going to use `kubectl` but just to peek into the cluster and see what's going on under the hood:
 ```sh
 brew install kubectl
 ```
