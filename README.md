@@ -395,6 +395,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../base/simple-streaming-app
+  - client-credentials-secret.yaml
 patches:
   - path: simple-streaming-app-values.yaml
     target:
