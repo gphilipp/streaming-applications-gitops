@@ -337,10 +337,13 @@ metadata:
   name: simple-streaming-app
   namespace: demo-apps
 spec:
+  interval: 10m # check for drift in-cluster 
+  releaseName: simple-streaming-app
   chart:
     spec:
       chart: simple-streaming-app
       reconcileStrategy: ChartVersion
+      interval: 2m # check for new chart versions every two minutes
       sourceRef:
         kind: HelmRepository
         name: simple-streaming-app-helm-repo
