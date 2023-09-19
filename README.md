@@ -13,6 +13,8 @@ You need:
 - A GitHub account
 - [Homebrew](https://brew.sh)
 
+Note: there's a [troubleshooting](#troubleshooting) section at the bottom of this exercise.
+
 ### Install Kind
 
 We need a Kubernetes cluster to deploy FluxCD and run our application.
@@ -504,6 +506,31 @@ Once the application deployment is reconciled, you will see that messages will b
 
 ![messages](images/messages.png)
 
+
+## Troubleshooting
+
+If you encounter an error, first validate that all your files are valid by using the `validate.sh` script [here](https://github.com/fluxcd/flux2-kustomize-helm-example/blob/main/scripts/validate.sh)
+
+If you want to check that you have configured the `apps` kustomization correctly run
+```shell
+flux tree kustomization apps
+```
+The output should be 
+```
+Kustomization/flux-system/apps
+├── Namespace/demo-apps
+├── Secret/demo-apps/client-credentials
+├── Secret/demo-apps/docker-regcred
+├── HelmRelease/demo-apps/simple-streaming-app
+│   ├── ServiceAccount/demo-apps/simple-streaming-app
+│   ├── Service/demo-apps/simple-streaming-app
+│   └── Deployment/demo-apps/simple-streaming-app
+└── HelmRepository/demo-apps/simple-streaming-app-helm-repo
+```
+
+Use the `flux events` command or the UI dashboard to see the events that occurred in Flux.
+
+
 ## Going further
 If you want to go further, you can :
 - investigate multi-tenancy with https://github.com/fluxcd/flux2-multi-tenancy
@@ -512,6 +539,9 @@ If you want to go further, you can :
 
 ## Closing remarks
 This exercise is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) example by the Flux team. Kudos to [Stefan Prodan](https://www.linkedin.com/in/stefanprodan) from Weaveworks for reviewing this exercise and suggesting improvements. 
+
+
+
 
 ## Questions:
 
