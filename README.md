@@ -116,7 +116,7 @@ A key concern when adopting GitOps is how you handle your secrets as it's out of
 
 ## Secrets Managements
 In order to store our secrets, we're not going to use the Sealed Secret option which I mentioned in the video course, but rely on Flux native secrets decryption instead.
-Flux built-in decryption feature works great with [CNCF SOPS](https://www.cncf.io/projects/sops/) and [Age encryption](https://github.com/FiloSottile/age.
+Flux built-in decryption feature works great with [CNCF SOPS](https://www.cncf.io/projects/sops/) and [Age encryption](https://github.com/FiloSottile/age).
 
 Let's install both tools:
 
@@ -246,6 +246,7 @@ kubectl create secret generic client-credentials \
     --from-literal=schema-registry-api-key=YOUR_SCHEMA-REGISTRY-API-KEY \
     --from-literal=schema-registry-api-secret=YOUR_SCHEMA-REGISTRY-API-SECRET \
     --dry-run=client \
+    --namespace=demo-apps \
     -o yaml > apps/staging/client-credentials-secret.yaml
 ```
 
