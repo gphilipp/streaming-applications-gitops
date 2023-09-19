@@ -109,8 +109,10 @@ git clone https://github.com/$GITHUB_USER/streaming-applications-gitops
 cd streaming-applications-gitops
 ```
 
+Before we move on and create the files necessary to deploy our apps, we're going to configure some infrastructure components.
+
 ## Install the Weave GitOps Dashboard
-Before we move on and create the files necessary to deploy our apps, we're going to install a nice dashboard to get us a visual interface and understand what's going on.
+It's always nice to have a dashboard to see what's going on, so let's install the Weave GitOps Dashboard:
 
 Install the open source Weave GitOps CLI with:
 ```shell
@@ -128,7 +130,7 @@ gitops create dashboard ww-gitops \
   --export > infrastructure/controllers/weave-gitops-dashboard.yaml
 
 ```
-Create a file `clusters/staging/infrastructure.yaml`:
+Create the following Kustomization file as `clusters/staging/infrastructure.yaml`:
 ```yaml
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
