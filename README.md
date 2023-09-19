@@ -36,11 +36,6 @@ You will also need `kubectl` so let's install it now:
 brew install kubectl
 ```
 
-Activate the cluster with the following command:
-```sh
-kubectl cluster-info --context kind-staging
-```
-
 Let's check if we can see the Kubernetes node created by Kind:
 ```sh
 kubectl get nodes
