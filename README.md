@@ -488,13 +488,13 @@ echo $GITHUB_TOKEN | helm registry login ghcr.io/$GITHUB_USER --username $GITHUB
 
 You should now package up the application helm chart.  
 ```shell
- cd deploy 
- helm package simple-streaming-app
+cd deploy 
+helm package simple-streaming-app
 ```
  
 Finally, publish it as a package to GitHub Container Registry:
 ```sh
- export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
+export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
 helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
 ```
 
