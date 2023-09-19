@@ -351,10 +351,10 @@ spec:
         name: simple-streaming-app-helm-repo
   install:
     remediation:
-      retries: -1
+      retries: -1 # retry forever for demo purpose
   upgrade:
     remediation:
-      retries: -1
+      retries: -1 # retry forever for demo purpose
 ```
 
 Create a flux source for the application Helm Repository
