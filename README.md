@@ -44,7 +44,7 @@ kubectl get nodes
 Here's what you should see:
 ```shell
 NAME                                   STATUS   ROLES           AGE   VERSION
-streaming-apps-gitops-control-plane   Ready    control-plane   16m   v1.27.1
+staging-control-plane   Ready    control-plane   16m   v1.27.1
 ```
 
 ### Install FluxCD
