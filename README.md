@@ -346,6 +346,8 @@ spec:
         name: simple-streaming-app-helm-repo
   install:
     createNamespace: true
+    remediation:
+      retries: -1
   interval: 2m
   releaseName: simple-streaming-app-release-name
 ```
