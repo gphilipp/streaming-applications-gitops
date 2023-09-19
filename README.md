@@ -348,6 +348,9 @@ spec:
     createNamespace: true
     remediation:
       retries: -1
+  upgrade:
+    remediation:
+      retries: -1
   interval: 2m
   releaseName: simple-streaming-app-release-name
 ```
