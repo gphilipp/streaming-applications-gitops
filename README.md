@@ -224,7 +224,7 @@ You will be able to use dashboard to understand what's going on and troubleshoot
 ![Weave GitOps dashboard](images/weave-gitops-dashboard.png)
 
 
-It's time to configure application deployment.
+It's now time to configure application deployment.
 
 ## Create the `apps` directory structure
 
@@ -376,10 +376,9 @@ resources:
   - namespace.yaml
   - repository.yaml
   - release.yaml
-  - docker-secret.yaml
 ```
 
-## Create the files under the ./apps/staging folder
+## Customize values for staging  
 
 We're going to customize the versions of the helm chart versions we allow to deploy in the staging cluster. Create the file `apps/staging/simple-streaming-app-values.yaml`:
 ```yaml
