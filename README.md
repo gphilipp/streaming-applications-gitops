@@ -15,7 +15,7 @@ You need:
 
 ### Install Kind
 
-We're going to need a Kubernetes cluster to deploy FluxCD and run our application.
+We need a Kubernetes cluster to deploy FluxCD and run our application.
 If you don't already have a Kubernetes cluster to play with, you can create one with [Kind](https://kind.sigs.k8s.io).  
 
 Once you have Homebrew installed, just run:
