@@ -3,7 +3,7 @@
 
 Start from scratch and in under 10 minutes, have a GitOps system that auto-deploys a streaming application in a Kubernetes cluster, using just a handful of config files in a Git repository.
 
-![flux-dashboard-applications-tab.png](images/flux-dashboard-applications-tab.png)
+![Flux dashboard applications tab](images/flux-dashboard-applications-tab.png)
 
 # Instructions
 
@@ -12,11 +12,11 @@ In this exercise, we're going to see how to deploy and run a Kafka streaming app
 You will:
 1. Create a local Kubernetes cluster.
 2. Install the FluxCD GitOps tool.
-3. Build and package a simple kafka producing application.
+3. Build and package a simple Kafka producer application.
 4. Deploy this application by just committing code to GitHub.
 
 You need:
-- A Confluent Cloud cluster (the Staging cluster you provisioned in the previous hands-on exercise will do)
+- A Confluent Cloud cluster (the `staging` cluster you provisioned in the previous hands-on exercise will do. If you have none, follow https://docs.confluent.io/cloud/current/get-started/index.html)
 - A GitHub account
 - [Homebrew](https://brew.sh)
 
@@ -24,8 +24,8 @@ Note: there's a [troubleshooting](#troubleshooting) section at the bottom of thi
 
 ### Install Kind
 
-We need a Kubernetes cluster to deploy FluxCD and run our application.
-If you don't already have a Kubernetes cluster to play with, you can create one with [Kind](https://kind.sigs.k8s.io).  
+You need a Kubernetes cluster to deploy FluxCD and run the sample application.
+If you don't already have a Kubernetes cluster to play with, you can create one with [Kind](https://kind.sigs.k8s.io).
 
 Once you have Homebrew installed, just run:
 
@@ -35,12 +35,12 @@ brew install kind
 
 ## Create a local Kubernetes cluster
 
-Next up, create a cluster 
+Next up, create a cluster
 ```shell
 kind create cluster --name staging
 ```
 
-We're also going to use `kubectl` just as a handy file creation tool and also to peek into the cluster to see what's going on.
+We're going to use `kubectl` just as a handy file creation tool and also to peek into the cluster to see what's going on.
 ```sh
 brew install kubectl
 ```
@@ -121,7 +121,7 @@ git clone https://github.com/$GITHUB_USER/streaming-applications-gitops
 cd streaming-applications-gitops
 ```
 
-A key concern when adopting GitOps is how you handle your secrets as it's out of question to store them in clear in the Git repository.  
+A key concern when adopting GitOps is how you handle your secrets as it's out of question to store them in clear in the Git repository.
 
 ## Secrets Managements
 In order to store our secrets, we're not going to use the Sealed Secret option which I mentioned in the video course, but rely on Flux native secrets decryption instead.
@@ -158,13 +158,14 @@ rm private.agekey
 
 Before we move on and create the files necessary to deploy our apps, we're going to configure some infrastructure components.
 
-## Create the `infrastructure` directory structure
+## Create the 'infrastructure' directory structure
 ```shell
 mkdir -p infrastructure/controllers
 mkdir -p infrastructure/staging
 ```
- 
+
 ## Install the Weave GitOps Dashboard
+
 It's always nice to have a dashboard to see what's going on, so let's install the Weave GitOps Dashboard:
 
 Install the open source Weave GitOps CLI with:
@@ -209,29 +210,32 @@ Remember, nothing will be deployed until we commit and push.
 ## Deploy the infrastructure
 
 Commit and push our infrastructure components:
+
 ```shell
 git add clusters infrastructure
 git commit -m "Deploy infrastructure"
 git push origin main
+
+# this command will block until all things are ready (ks stands for kustomization)
+flux reconcile ks flux-system --with-source
 ```
 
-Wait a few seconds for the Weave GitOps controller pod to appear under the name `ww-gitops-weave-gitops-XXXX`:
+Once done, run the following command to wait for the infrastructure components to be installed:
+
 ```shell
-kubectl get pods --namespace flux-system -w 
+flux reconcile ks infrastructure
 ```
 
-When the pod is up and running, in a separate terminal, forward the service port to your host machine:
+When this command terminates, in a separate terminal, create a client tunnel by forwarding the service port to your host machine:
 ```shell
 kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
 ```
 
-Point your browser to `http://localhost:9001`, the login is `admin` and the `password` is `admin` too.
-You will be able to use dashboard to understand what's going on and troubleshoot issues.
+Point your browser to `http://localhost:9001`, the login is `admin` and the `password` is `admin` too. You will be able to use the dashboard to understand what's going on and troubleshoot issues.
 
 ![Weave GitOps dashboard](images/weave-gitops-dashboard.png)
 
-
-It's now time to configure application deployment.
+Next, let's configure application deployment.
 
 ## Create the `apps` directory structure
 
@@ -285,9 +289,8 @@ sops --age=$(cat clusters/staging/public.agekey) \
 
 If you open the `apps/staging/client-credentials-secret.yaml` file, you will see that the value of the `data` property has been encrypted.
 
-
 ## Create a secret for your Helm Chart registry
-Flux needs permission to access your Helm Charts registry in order to fetch the helm charts from your own private GitHub Container Registry. 
+Flux needs permission to access your Helm Charts registry in order to fetch the helm charts from your own private GitHub Container Registry.
 
 Create a secret for your token:
 ```shell
@@ -304,7 +307,6 @@ sops --age=$(cat clusters/staging/public.agekey) \
 --encrypt --encrypted-regex '^(data|stringData)$' \
 --in-place apps/staging/ghcr-auth.yaml
 ```
-
 
 ## Create a secret to access your Docker Images registry
 
@@ -385,7 +387,7 @@ resources:
   - release.yaml
 ```
 
-## Customize values for staging  
+## Customize values for staging
 
 We're going to customize the versions of the helm chart versions we allow to deploy in the staging cluster. Create the file `apps/staging/simple-streaming-app-values.yaml`:
 ```yaml
@@ -437,21 +439,25 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 First, let's build the Docker image:
 
 ```shell
-docker build  -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0 . 
+docker build -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0 . 
 docker push ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0
 ```
-Next up, log into the Helm Registry.
+
+Next up, log into the Helm Registry:
+
 ```sh
 echo $GITHUB_TOKEN | helm registry login ghcr.io/$GITHUB_USER --username $GITHUB_USER --password-stdin
 ```
 
-You should now package up the application helm chart.  
+Let's build the application helm chart package:
+
 ```shell
-cd deploy 
+cd deploy
 helm package simple-streaming-app
 ```
- 
-Finally, publish it as a package to GitHub Container Registry:
+
+Finally, publish it to GitHub Container Registry under `/charts`:
+
 ```sh
 export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
 helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
@@ -464,14 +470,14 @@ open https://github.com/users/$GITHUB_USER/packages/container
 
 ## Create the users topic
 
-Before we deploy the application, we need the topic in Confluent Cloud. 
-You can either: 
-  1. Create a pre-task that runs a `curl` command and use the [Confluent Cloud Topic Creation API](https://docs.confluent.io/cloud/current/api.html#tag/Topic-(v3)/operation/createKafkaTopic).
-  2. Create a pre-task with the [Weave GitOps Terraform Controller](https://github.com/weaveworks/tf-controller) to reconcile a Terraform Topic resource the GitOps way
+Before we deploy the application, we need the topic in Confluent Cloud.
+You can either:
+1. Create a pre-task that runs a `curl` command and use the [Confluent Cloud Topic Creation API](https://docs.confluent.io/cloud/current/api.html#tag/Topic-(v3)/operation/createKafkaTopic).
+2. Create a pre-task with the [Weave GitOps Terraform Controller](https://github.com/weaveworks/tf-controller) to reconcile a Terraform Topic resource the GitOps way
 
 For the sake of brevity, just create the `users` topic manually in the Confluent Cloud UI console.
 
-![Create users topic](images/create-topic.png)
+![create-users topic](images/create-users-topic.png)
 
 ## Deploy the application in the Staging cluster
 
@@ -509,20 +515,49 @@ git commit -m "Deploy apps"
 git push origin main
 ```
 
-Once the application deployment is reconciled, you will see that messages will be published in the `users` topic in your Confluent Cloud Cluster.
+Once the application deployment is reconciled, you will see that messages will be published every 30 seconds in the `users` topic in your Confluent Cloud Cluster.
 
-![messages](images/messages.png)
+![Messages in Confluent Cloud](images/messages.png)
 
+The Flux dashboard at http://localhost:9001 should now be showing all the deployed components:
+
+![Flux dashboard applications tab](images/flux-dashboard-applications-tab.png)
+
+You can also drill down in each one and display a relationship graph, e.g. for `simple-streaming-app`:
+
+![Flux dashboard simple-streaming-app graph](images/flux-dashboard-simple-streaming-app-graph.png)
+
+## Update the application
+Let's verify that publishing a new version of the application will have it deployed automatically.
+
+1. Update `SimpleStreamingApp.java` and change the name and email from `John` and `john@example.com` to `Jane` and `jane@example.com`.
+2. Bump `version` and `appVersion` values in `Charts.yaml` to `0.2.0`
+3. In the top directory of the repo, run
+
+    ```shell
+    docker build -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0 . 
+    docker push ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0
+    ```
+
+4. Package the new Helm chart with `cd deploy && helm package simple-streaming-app`
+5. Publish it to ghcr.io with:
+
+    ```shell
+    export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
+    helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
+    ```
+
+Wait for a moment, and you will see new messages published with `Jane`, congratulations!
 
 ## Troubleshooting
 
-If you encounter an error, first validate that all your files are valid by using the `validate.sh` script [here](https://github.com/fluxcd/flux2-kustomize-helm-example/blob/main/scripts/validate.sh)
+If you encounter an error, first validate that all your files are valid by using the `validate.sh` script [here](https://github.com/fluxcd/flux2-kustomize-helm-example/blob/main/scripts/validate.sh), note that you need to `brew install kustomize kubeconform` to run the script.
 
 If you want to check that you have configured the `apps` kustomization correctly run
 ```shell
 flux tree kustomization apps
 ```
-The output should be 
+The output should be: 
 ```
 Kustomization/flux-system/apps
 ├── Namespace/demo-apps
@@ -537,46 +572,12 @@ Kustomization/flux-system/apps
 
 Use the `flux events` command or the UI dashboard to see the events that occurred in Flux.
 
-
-## Update the application
-Let's verify that publishing a new version of the application will have it deployed automatically.
-
-1. Update `SimpleStreamingApp.java` and change the name and email from `John` and `john@example.com` to `Jane` and `jane@example.com`.
-2. Bump `version` and `appVersion` values in `Charts.yaml` to `0.2.0`
-3. In the top directory of the repo, run 
-
-    ```shell
-    docker build  -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0 . 
-    docker push ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0
-    ```
-    
-4. Package the new Helm chart with `cd deploy && helm package simple-streaming-app`
-5. Publish it to ghcr.io with:
-
-    ```shell
-    export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml     | tail -n1 | awk '{ print $2 }')
-    helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
-    ```
-
-Wait for a moment and you will see new messages published with `Jane`, congratulations!
-
 ## Going further
 If you want to go further, you can :
-- investigate multi-tenancy with https://github.com/fluxcd/flux2-multi-tenancy
+- investigate multi-tenancy with [Manage multi-tenant clusters with Flux](https://github.com/fluxcd/flux2-multi-tenancy)
 - implement a production promotion workflow similar to what we've done in the previous hands-on exercise using GitHub Actions and Pull Requests.
   You can find instructions for doing so on [Promote Flux Helm Releases with GitHub Actions](https://fluxcd.io/flux/use-cases/gh-actions-helm-promotion/).
 
 ## Closing remarks
-This exercise is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) example by the Flux team. Kudos to [Stefan Prodan](https://www.linkedin.com/in/stefanprodan) from Weaveworks for reviewing this exercise and suggesting improvements. 
-
-
-
-
-## Questions:
-
-1. After I run `kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001` the UI is available at http://localhost:9001 but https://localhost:9001 won't work. 
-2. Is that ok to run the kubectl command "kubectl create secret generic sops-age --namespace=flux-system --from-file=private.agekey" direclty on the cluster
-2. Shouldn't we have `apps/staging/simple-streaming-app` to mirror what we have in `base`? 
-3. Under which directory should the `public.agekey` file live, would that be `clusters/staging`, or is it environment  agnostic? 
-4.Once I push to Git, does Flux fetch the content of the repo immediately and syncs it to the cluster? and after that at every `sync-interval`? 
-5. Is it best to use `kubectl create secret docker-registry` or `flux create secret ...`?
+- This exercise is loosely inspired from the [GitOps workflow example for multi-env deployments with Flux, Kustomize and Helm.](https://github.com/fluxcd/flux2-kustomize-helm-example) written by the Flux team. 
+- Kudos to [Stefan Prodan](https://www.linkedin.com/in/stefanprodan) from Weaveworks for reviewing this exercise and suggesting improvements.
