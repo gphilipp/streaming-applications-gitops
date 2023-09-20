@@ -1,22 +1,31 @@
-# streaming-applications-gitops
+
+# Overview
+
+Start from scratch and in under 10 minutes, have a GitOps system that auto-deploys a streaming application in a Kubernetes cluster, using just a handful of config files in a Git repository.
+
+![Flux dashboard applications tab](images/flux-dashboard-applications-tab.png)
+
+# Instructions
 
 In this exercise, we're going to see how to deploy and run a Kafka streaming application on Kubernetes using the GitOps approach.
 
 You will:
 1. Create a local Kubernetes cluster.
 2. Install the FluxCD GitOps tool.
-3. Build and package a simple kafka producing application.
+3. Build and package a simple Kafka producer application.
 4. Deploy this application by just committing code to GitHub.
 
 You need:
-- A Confluent Cloud cluster (the Staging cluster you provisioned in the previous hands-on exercise will do)
+- A Confluent Cloud cluster (the `staging` cluster you provisioned in the previous hands-on exercise will do. If you have none, follow https://docs.confluent.io/cloud/current/get-started/index.html)
 - A GitHub account
 - [Homebrew](https://brew.sh)
 
+Note: there's a [troubleshooting](#troubleshooting) section at the bottom of this exercise.
+
 ### Install Kind
 
-We're going to need a Kubernetes cluster to deploy FluxCD and run our application.
-If you don't already have a Kubernetes cluster to play with, you can create one with [Kind](https://kind.sigs.k8s.io).  
+You need a Kubernetes cluster to deploy FluxCD and run the sample application.
+If you don't already have a Kubernetes cluster to play with, you can create one with [Kind](https://kind.sigs.k8s.io).
 
 Once you have Homebrew installed, just run:
 
@@ -26,52 +35,48 @@ brew install kind
 
 ## Create a local Kubernetes cluster
 
-Next up, create a cluster 
-```sh
-kind create cluster --name streaming-apps-gitops
+Next up, create a cluster
+```shell
+kind create cluster --name staging
 ```
 
-You will also need `kubectl` so let's install it now:
+We're going to use `kubectl` just as a handy file creation tool and also to peek into the cluster to see what's going on.
 ```sh
 brew install kubectl
 ```
 
-Activate the cluster with the following command:
-```sh
-kubectl cluster-info --context kind-streaming-apps-gitops
-```
-
 Let's check if we can see the Kubernetes node created by Kind:
-```sh
+```shell
 kubectl get nodes
 ```
 
 Here's what you should see:
 ```shell
 NAME                                   STATUS   ROLES           AGE   VERSION
-streaming-apps-gitops-control-plane   Ready    control-plane   16m   v1.27.1
+staging-control-plane   Ready    control-plane   19s   v1.27.1
 ```
 
 ### Install FluxCD
 Next up, let's install the [FluxCD GitOps tool](https://fluxcd.io).
-```
+
+```shell
 brew install fluxcd/tap/flux
 ```
 
 You will need to export your GitHub username and a classic GitHub Personal Access Token, just make sure that this token has the permissions to read/write repositories AND packages too.
 
-```sh
+```shell
 export GITHUB_USER=<your github username>
 export GITHUB_TOKEN=<your github personal access token>
 ```
 
 Let's verify that we have all we need before going further with FluxCD:
 
-```sh
+```shell
 flux check --pre
 ```
 
-If you see the following, all is good!
+If you see the following, it's all good!
 
 ```shell
 ► checking prerequisites
@@ -85,10 +90,13 @@ Let's have flux go through the bootstrap process to create a new GitHub reposito
 flux bootstrap github \
   --owner=$GITHUB_USER \
   --repository=streaming-applications-gitops \
+  --context=kind-staging \
   --branch=main \
   --path=./clusters/staging \
   --personal
 ```
+
+Note that in this exercise, we're going to use a few `flux create` commands to create the files locally, but we're also going to write `yaml` files directly too to prove that there's nothing special about the `flux create` command. Ultimately, it's all about having the right files in the right place in the repo!
 
 Once the bootstrap is done, when you list the namespaces, you should see that the `flux bootstrap` command has created a `flux-system` namespace:
 ```shell
@@ -113,8 +121,52 @@ git clone https://github.com/$GITHUB_USER/streaming-applications-gitops
 cd streaming-applications-gitops
 ```
 
+A key concern when adopting GitOps is how you handle your secrets as it's out of question to store them in clear in the Git repository.
+
+## Secrets Managements
+In order to store our secrets, we're not going to use the Sealed Secret option which I mentioned in the video course, but rely on Flux native secrets decryption instead.
+Flux built-in decryption feature works great with [CNCF SOPS](https://www.cncf.io/projects/sops/) and [Age encryption](https://github.com/FiloSottile/age).
+
+Let's install both tools:
+
+```shell
+brew install age sops
+```
+
+Generate a key pair with Age:
+```shell
+age-keygen -o private.agekey
+```
+
+Create a Kubernetes Secret in the `flux-system` namespace with the private key:
+
+```shell
+kubectl create secret generic sops-age --namespace=flux-system --from-file=private.agekey
+```
+
+Save the public key to a file in the repo:
+```shell
+age-keygen -y private.agekey > clusters/staging/public.agekey
+```
+
+Store the private key in a safe place like a Vault and only use it for disaster recovery.
+It's best to delete the private key from your filesystem to avoid pushing it upstream:
+
+```shell
+rm private.agekey
+```
+
+Before we move on and create the files necessary to deploy our apps, we're going to configure some infrastructure components.
+
+## Create the 'infrastructure' directory structure
+```shell
+mkdir -p infrastructure/controllers
+mkdir -p infrastructure/staging
+```
+
 ## Install the Weave GitOps Dashboard
-Before we move on and create the files necessary to deploy our apps, we're going to install a nice dashboard to get us a visual interface and understand what's going on.
+
+It's always nice to have a dashboard to see what's going on, so let's install the Weave GitOps Dashboard:
 
 Install the open source Weave GitOps CLI with:
 ```shell
@@ -122,26 +174,27 @@ brew tap weaveworks/tap
 brew install weaveworks/tap/gitops
 ```
 
-Deploy the dashboard with:
+Create the dashboard Helm Repository and Release configuration file with:
 ```shell
-mkdir -p infrastructure/controllers
-
 PASSWORD="admin"
 gitops create dashboard ww-gitops \
   --password=$PASSWORD \
   --export > infrastructure/controllers/weave-gitops-dashboard.yaml
-
 ```
-Create a file `clusters/staging/infrastructure.yaml`:
+
+Create the following Kustomization file as `clusters/staging/infrastructure.yaml`:
 ```yaml
----
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: infra-controllers
+  name: infrastructure
   namespace: flux-system
 spec:
-  interval: 1h
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  interval: 2m
   retryInterval: 1m
   timeout: 5m
   sourceRef:
@@ -152,95 +205,51 @@ spec:
   wait: true
 ```
 
-Commit and push
+Remember, nothing will be deployed until we commit and push.
+
+## Deploy the infrastructure
+
+Commit and push our infrastructure components:
+
 ```shell
 git add clusters infrastructure
-git commit -m "Deploy Weave GitOps Dashboard"
+git commit -m "Deploy infrastructure"
 git push origin main
+
+# this command will block until all things are ready (ks stands for kustomization)
+flux reconcile ks flux-system --with-source
 ```
 
-Wait a few seconds for the Weave GitOps controller service to appear under the name `ww-gitops-weave-gitops`:
+Once done, run the following command to wait for the infrastructure components to be installed:
+
 ```shell
-kubectl get services --namespace flux-system -w 
+flux reconcile ks infrastructure
 ```
 
-When the controller is up and running, in a separate terminal, forward the service port to your host machine:
+When this command terminates, in a separate terminal, create a client tunnel by forwarding the service port to your host machine:
 ```shell
 kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
 ```
 
-Point your browser to `https://localhost:9001`, the login is `admin` and the `password` is `admin` too.
-This dashboard will give you a clue to visualize what's going on and troubleshoot issues.
+Point your browser to `http://localhost:9001`, the login is `admin` and the `password` is `admin` too. You will be able to use the dashboard to understand what's going on and troubleshoot issues.
 
 ![Weave GitOps dashboard](images/weave-gitops-dashboard.png)
 
-## Install the Sealed Secret controller
-Kubernetes just computes a hash for classic secrets but what we really want is to store our secrets safely in the repository.
-For this purpose, we will use [Bitnami's Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) to encrypt the classic Kubernetes secrets.
+Next, let's configure application deployment.
 
-The first step is to deploy the Sealed Secrets controller and install the `kubeseal` CLI tool:
+## Create the `apps` directory structure
 
-```bash
-brew install kubeseal
-```
-
-Then, create a Flux `Helm repository` resource that points to the sealed-secrets Helm chart:
-```shell
-flux create source helm sealed-secrets \
-    --url https://bitnami-labs.github.io/sealed-secrets \
-    --interval 1h \
-    --export \
-    > infrastructure/controllers/sealed-secrets-source.yaml
-```
-
-Also create a Flux `Helm release` resource:
-
-```bash
-flux create helmrelease sealed-secrets \
-    --interval=1h \
-    --release-name=sealed-secrets \
-    --target-namespace=flux-system \
-    --source=HelmRepository/sealed-secrets \
-    --chart=sealed-secrets \
-    --chart-version=">=1.15.0-0" \
-    --crds=CreateReplace \
-    --export \
-    > infrastructure/controllers/sealed-secrets-release.yaml
-```
-
-Deploy the Sealed Secrets controller by pushing the files to GitHub:
+Create the following directories:
 
 ```shell
-git add infrastructure/
-git commit -m "Deploy Bitnami Sealed Secrets"
-git push origin main
-```
-
-The reconciliation process will automatically deploy the controller.
-
-You can now retrieve and store on your disk the public key from the `sealed-secrets` controller with `kubeseal`:
-```sh
-kubeseal --fetch-cert \
-    --controller-name=sealed-secrets \
-    --controller-namespace=flux-system \
-    > pub-sealed-secrets.pem
-```
-
-
-## Create the demo-apps namespace
-
-Run this command to 
-```shell
-kubectl create namespace demo-apps
-```
-Make this namespace the active one:
-```shell
-kubectl config set-context --current --namespace=demo-apps 
+mkdir -p apps/base/simple-streaming-app
+mkdir -p apps/staging
 ```
 
 ## Create secrets to connect to Confluent Cloud
 
-Create a dry-run normal secret in Kubernetes format into a file:
+Create the following Kubernetes Secret file to store the Confluent Cloud client properties (update the values with yours):
+
 ```shell
 kubectl create secret generic client-credentials \
     --from-literal=bootstrap-server=YOUR_BOOTSTRAP_SERVER \
@@ -250,7 +259,8 @@ kubectl create secret generic client-credentials \
     --from-literal=schema-registry-api-key=YOUR_SCHEMA-REGISTRY-API-KEY \
     --from-literal=schema-registry-api-secret=YOUR_SCHEMA-REGISTRY-API-SECRET \
     --dry-run=client \
-    -o yaml > client-credentials-secret.yaml
+    --namespace=demo-apps \
+    -o yaml > apps/staging/client-credentials-secret.yaml
 ```
 
 In my case, the `client-credentials-secret.yaml` file looks like this:
@@ -269,71 +279,38 @@ metadata:
   name: client-credentials
 ```
 
-Use the `kubeseal` CLI to create a Sealed Secret, it will be attached to the currently active namespace (`demo-apps`): 
-
-```bash
-mkdir -p apps/staging 
-kubeseal --format=yaml --cert=pub-sealed-secrets.pem \
-    < client-credentials-secret.yaml \
-    > apps/staging/client-credentials-sealed-secret.yaml
-```
-
-Let's have a look at the file:
-```shell
-cat apps/staging/client-credentials-sealed-secret.yaml
-```
-
-It should look like this, note that it represents a SealedSecret object.
+Let's encrypt it in-place:
 
 ```shell
-apiVersion: bitnami.com/v1alpha1
-kind: SealedSecret
-metadata:
-  creationTimestamp: null
-  name: client-credentials
-  namespace: demo-apps
-spec:
-  encryptedData:
-    bootstrap-server: ***********************************
-    cluster-api-key: ***********************************==
-    cluster-api-secret: ***********************************==
-    schema-registry-api-key: ***********************************
-    schema-registry-api-secret: ***********************************
-    schema-registry-url: ***********************************=
-  template:
-    metadata:
-      creationTimestamp: null
-      name: client-credentials
-      namespace: demo-apps
+sops --age=$(cat clusters/staging/public.agekey) \
+--encrypt --encrypted-regex '^(data|stringData)$' \
+--in-place apps/staging/client-credentials-secret.yaml
 ```
 
-Commit and push
-```shell
-git add apps/staging
-git commit -m "Add confluent cloud client credentials"
-git push origin main
-```
-
-You have to apply the manifest manually (for some reason Flux doesn't register it automatically):
-```shell
-kubectl apply -f apps/staging/client-credentials-sealed-secret.yaml
-```
+If you open the `apps/staging/client-credentials-secret.yaml` file, you will see that the value of the `data` property has been encrypted.
 
 ## Create a secret for your Helm Chart registry
-Flux will need permission to access your Helm Charts registry in order to fetch the helm charts from your own private Github Container Registry. 
+Flux needs permission to access your Helm Charts registry in order to fetch the helm charts from your own private GitHub Container Registry.
 
 Create a secret for your token:
 ```shell
 flux create secret oci ghcr-auth \
   --url=ghcr.io \
   --username=flux \
-  --password=${GITHUB_TOKEN}
+  --password=${GITHUB_TOKEN} \
+  --export > apps/staging/ghcr-auth.yaml
+```
+
+Also encrypt the sensitive data with:
+```shell
+sops --age=$(cat clusters/staging/public.agekey) \
+--encrypt --encrypted-regex '^(data|stringData)$' \
+--in-place apps/staging/ghcr-auth.yaml
 ```
 
 ## Create a secret to access your Docker Images registry
-You also need to generate a docker registry secret, so that Flux can pull docker images from your own private Github Container Registry.
 
-This command will just do a dry-run creation of the secret and write it to a file:
+You also need to generate a docker registry secret, so that Flux can pull docker images from your own private GitHub Container Registry:
 
 ```shell
 kubectl create secret docker-registry docker-regcred \
@@ -342,31 +319,18 @@ kubectl create secret docker-registry docker-regcred \
 --docker-username=$GITHUB_USER \
 --docker-password=$GITHUB_TOKEN \
 --namespace=demo-apps \
--o yaml > docker-secret.yaml
+-o yaml > apps/staging/docker-secret.yaml
 ```
 
-Seal this classic Kubernetes secret with `kubeseal`:
+Once again, encrypt the sensitive data in-place:
 
 ```shell
-mkdir -p apps/base/simple-streaming-app
-kubeseal --format=yaml --cert=pub-sealed-secrets.pem < docker-secret.yaml > apps/base/simple-streaming-app/docker-secret-sealed-secret.yaml
+sops --age=$(cat clusters/staging/public.agekey) \
+--encrypt --encrypted-regex '^(data|stringData)$' \
+--in-place apps/staging/docker-secret.yaml
 ```
 
-Commit and push
-```shell
-git add apps/base
-git commit -m "Add Docker Registry secret"
-git push origin main
-```
-
-You have to apply the manifest manually (for some reason Flux doesn't register it automatically):
-```shell
-kubectl apply -f apps/base/simple-streaming-app/docker-secret-sealed-secret.yaml
-```
-
-## Create the files under the ./apps/base folder
-
-Create a file `apps/base/simple-streaming-app/namespace.yaml`:
+Create a file `apps/base/simple-streaming-app/namespace.yaml` to have the namespace automatically created too:
 ```yaml
 apiVersion: v1
 kind: Namespace
@@ -384,37 +348,32 @@ metadata:
   name: simple-streaming-app
   namespace: demo-apps
 spec:
+  interval: 10m # check for drift in-cluster 
+  releaseName: simple-streaming-app
   chart:
     spec:
       chart: simple-streaming-app
       reconcileStrategy: ChartVersion
+      interval: 2m # check for new chart versions every two minutes
       sourceRef:
         kind: HelmRepository
         name: simple-streaming-app-helm-repo
   install:
-    createNamespace: true
-  interval: 2m
-  releaseName: simple-streaming-app-release-name
+    remediation:
+      retries: -1 # retry forever for demo purpose
+  upgrade:
+    remediation:
+      retries: -1 # retry forever for demo purpose
 ```
 
-Create a file `apps/base/simple-streaming-app/repository.yaml`, don't forget to replace `YOUR_GIHTUB_USER` in the file with your own GitHub username:
-```yaml
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmRepository
-metadata:
-  name: simple-streaming-app-helm-repo
-  namespace: demo-apps
-spec:
-  interval: 1m
-  type: oci
-  url: oci://ghcr.io/YOUR_GIHTUB_USER/charts
-  secretRef:
-    name: docker-regcred
-```
-
-You have to apply the manifest manually (for some reason Flux doesn't register it automatically):
+Create a flux source for the application Helm Repository
 ```shell
-kubectl apply -f apps/base/simple-streaming-app/repository.yaml
+flux create source helm simple-streaming-app-helm-repo \
+  --url=oci://ghcr.io/$GITHUB_USER/charts \
+  --interval=1m \
+  --namespace=demo-apps \
+  --secret-ref=docker-regcred \
+  --export > apps/base/simple-streaming-app/repository.yaml 
 ```
 
 Finally, create a Kustomization file `apps/base/simple-streaming-app/kustomization.yaml`:
@@ -426,12 +385,11 @@ resources:
   - namespace.yaml
   - repository.yaml
   - release.yaml
-  - docker-secret-sealed-secret.yaml
 ```
 
-## Create the files under the ./apps/staging folder
+## Customize values for staging
 
-Create the file `apps/staging/simple-streaming-app-values.yaml`:
+We're going to customize the versions of the helm chart versions we allow to deploy in the staging cluster. Create the file `apps/staging/simple-streaming-app-values.yaml`:
 ```yaml
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
@@ -451,21 +409,13 @@ Finally, create the Kustomization file `apps/staging/kustomization.yaml`:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ../base/simple-streaming-app/release.yaml
+  - ../base/simple-streaming-app
+  - docker-secret.yaml
+  - client-credentials-secret.yaml
 patches:
   - path: simple-streaming-app-values.yaml
     target:
       kind: HelmRelease
-  - path: client-credentials-sealed-secret.yaml
-    target:
-      kind: SealedSecret
-```
-
-Commit and push
-```shell
-git add apps
-git commit -m "Add apps files"
-git push origin main
 ```
 
 ## Build, package and publish the example application
@@ -489,23 +439,27 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 First, let's build the Docker image:
 
 ```shell
-docker build  -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0 . 
+docker build -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0 . 
 docker push ghcr.io/$GITHUB_USER/simple-streaming-app:0.1.0
 ```
-Next up, log into the Helm Registry.
+
+Next up, log into the Helm Registry:
+
 ```sh
 echo $GITHUB_TOKEN | helm registry login ghcr.io/$GITHUB_USER --username $GITHUB_USER --password-stdin
 ```
 
-You should now package up the application helm chart.  
+Let's build the application helm chart package:
+
 ```shell
- cd deploy 
- helm package simple-streaming-app
+cd deploy
+helm package simple-streaming-app
 ```
- 
-Finally, publish it as a package to GitHub Container Registry:
+
+Finally, publish it to GitHub Container Registry under `/charts`:
+
 ```sh
- export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
+export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
 helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
 ```
 
@@ -514,21 +468,22 @@ Point your browser to your own Helm Chart repository and verify that it's there:
 open https://github.com/users/$GITHUB_USER/packages/container
 ```
 
-
 ## Create the users topic
 
-Before we deploy the application, we need the topic in Confluent Cloud. 
-You can either: 
-  1. Create a pre-task that runs a `curl` command and use the [Confluent Cloud Topic Creation API](https://docs.confluent.io/cloud/current/api.html#tag/Topic-(v3)/operation/createKafkaTopic).
-  2. Create a pre-task with the [Weave GitOps Terraform Controller](https://github.com/weaveworks/tf-controller) to reconcile a Terraform Topic resource the GitOps way
+Before we deploy the application, we need the topic in Confluent Cloud.
+You can either:
+1. Create a pre-task that runs a `curl` command and use the [Confluent Cloud Topic Creation API](https://docs.confluent.io/cloud/current/api.html#tag/Topic-(v3)/operation/createKafkaTopic).
+2. Create a pre-task with the [Weave GitOps Terraform Controller](https://github.com/weaveworks/tf-controller) to reconcile a Terraform Topic resource the GitOps way
 
 For the sake of brevity, just create the `users` topic manually in the Confluent Cloud UI console.
 
-![Create users topic](images/create-topic.png)
+![create-users topic](images/create-users-topic.png)
 
 ## Deploy the application in the Staging cluster
 
-Create a file `clusters/staging/apps.yaml`:
+Our last step is to actually deploy the application in the staging cluster.
+
+You must create the following file as `clusters/staging/apps.yaml`:
 ```shell
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -536,6 +491,12 @@ metadata:
   name: apps
   namespace: flux-system
 spec:
+  dependsOn:
+    - name: infrastructure
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
   interval: 1m0s
   sourceRef:
     kind: GitRepository
@@ -546,20 +507,77 @@ spec:
   timeout: 1m0s
 ```
 
+It's time to deploy the applications, you just have to commit and push:
+
 ```shell
-git add clusters
-git commit -m "Add apps to the cluster"
+git add apps clusters
+git commit -m "Deploy apps"
 git push origin main
 ```
 
-Once the application deployment is reconciled, you will see that messages will be published in the `users` topic in your Confluent Cloud Cluster.
+Once the application deployment is reconciled, you will see that messages will be published every 30 seconds in the `users` topic in your Confluent Cloud Cluster.
 
-![messages](images/messages.png)
+![Messages in Confluent Cloud](images/messages.png)
 
-This exercise is loosely inspired from the [flux2-kustomize-helm-example](https://github.com/fluxcd/flux2-kustomize-helm-example) example by the Flux team.
+The Flux dashboard at http://localhost:9001 should now be showing all the deployed components:
+
+![Flux dashboard applications tab](images/flux-dashboard-applications-tab.png)
+
+You can also drill down in each one and display a relationship graph, e.g. for `simple-streaming-app`:
+
+![Flux dashboard simple-streaming-app graph](images/flux-dashboard-simple-streaming-app-graph.png)
+
+## Update the application
+Let's verify that publishing a new version of the application will have it deployed automatically.
+
+1. Update `SimpleStreamingApp.java` and change the name and email from `John` and `john@example.com` to `Jane` and `jane@example.com`.
+2. Bump `version` and `appVersion` values in `Charts.yaml` to `0.2.0`
+3. In the top directory of the repo, run
+
+    ```shell
+    docker build -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0 . 
+    docker push ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0
+    ```
+
+4. Package the new Helm chart with `cd deploy && helm package simple-streaming-app`
+5. Publish it to ghcr.io with:
+
+    ```shell
+    export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml | tail -n1 | awk '{ print $2 }')
+    helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
+    ```
+
+Wait for a moment, and you will see new messages published with `Jane`, congratulations!
+
+## Troubleshooting
+
+If you encounter an error, first validate that all your files are valid by using the `validate.sh` script [here](https://github.com/fluxcd/flux2-kustomize-helm-example/blob/main/scripts/validate.sh), note that you need to `brew install kustomize kubeconform` to run the script.
+
+If you want to check that you have configured the `apps` kustomization correctly run
+```shell
+flux tree kustomization apps
+```
+The output should be: 
+```
+Kustomization/flux-system/apps
+├── Namespace/demo-apps
+├── Secret/demo-apps/client-credentials
+├── Secret/demo-apps/docker-regcred
+├── HelmRelease/demo-apps/simple-streaming-app
+│   ├── ServiceAccount/demo-apps/simple-streaming-app
+│   ├── Service/demo-apps/simple-streaming-app
+│   └── Deployment/demo-apps/simple-streaming-app
+└── HelmRepository/demo-apps/simple-streaming-app-helm-repo
+```
+
+Use the `flux events` command or the UI dashboard to see the events that occurred in Flux.
+
+## Going further
 If you want to go further, you can :
-- implement a production promotion workflow similar to what we've done in the previous hands-on exercise using GitHub Actions and Pull Requests. 
-You can find instructions on how to do so on [Promote Flux Helm Releases with GitHub Actions](https://fluxcd.io/flux/use-cases/gh-actions-helm-promotion/).
-- investigate multi-tenancy with https://github.com/fluxcd/flux2-multi-tenancy
+- investigate multi-tenancy with [Manage multi-tenant clusters with Flux](https://github.com/fluxcd/flux2-multi-tenancy)
+- implement a production promotion workflow similar to what we've done in the previous hands-on exercise using GitHub Actions and Pull Requests.
+  You can find instructions for doing so on [Promote Flux Helm Releases with GitHub Actions](https://fluxcd.io/flux/use-cases/gh-actions-helm-promotion/).
 
-
+## Closing remarks
+- This exercise is loosely inspired from the [GitOps workflow example for multi-env deployments with Flux, Kustomize and Helm.](https://github.com/fluxcd/flux2-kustomize-helm-example) written by the Flux team. 
+- Kudos to [Stefan Prodan](https://www.linkedin.com/in/stefanprodan) from Weaveworks for reviewing this exercise and suggesting improvements.
