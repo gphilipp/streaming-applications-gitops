@@ -1,4 +1,11 @@
-# streaming-applications-gitops
+
+# Overview
+
+Start from scratch and in under 10 minutes, have a GitOps system that auto-deploys a streaming application in a Kubernetes cluster, using just a handful of config files in a Git repository.
+
+![flux-dashboard-applications-tab.png](images/flux-dashboard-applications-tab.png)
+
+# Instructions
 
 In this exercise, we're going to see how to deploy and run a Kafka streaming application on Kubernetes using the GitOps approach.
 
