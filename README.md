@@ -531,6 +531,28 @@ Kustomization/flux-system/apps
 Use the `flux events` command or the UI dashboard to see the events that occurred in Flux.
 
 
+## Update the application
+Let's verify that publishing a new version of the application will have it deployed automatically.
+
+1. Update `SimpleStreamingApp.java` and change the name and email from `John` and `john@example.com` to `Jane` and `jane@example.com`.
+2. Bump `version` and `appVersion` values in `Charts.yaml` to `0.2.0`
+3. In the top directory of the repo, run 
+
+    ```shell
+    docker build  -t ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0 . 
+    docker push ghcr.io/$GITHUB_USER/simple-streaming-app:0.2.0
+    ```
+    
+4. Package the new Helm chart with `cd deploy && helm package simple-streaming-app`
+5. Publish it to ghcr.io with:
+
+    ```shell
+    export CHART_VERSION=$(grep 'version:' ./simple-streaming-app/Chart.yaml     | tail -n1 | awk '{ print $2 }')
+    helm push ./simple-streaming-app-${CHART_VERSION}.tgz oci://ghcr.io/$GITHUB_USER/charts/
+    ```
+
+Wait for a moment and you will see new messages published with `Jane`, congratulations!
+
 ## Going further
 If you want to go further, you can :
 - investigate multi-tenancy with https://github.com/fluxcd/flux2-multi-tenancy
